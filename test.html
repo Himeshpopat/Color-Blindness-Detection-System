@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ishihara Test</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <nav>
+    <h2>Color Vision Detector</h2>
+  </nav>
+
+  <section class="hero">
+  <h1>Ishihara Test</h1>
+  <p id="questionCount">Question 1 of 3</p>
+
+  <div class="test-content">
+
+    <img id="plateImage" src="images/test1.png" width="300">
+
+    <input type="text" id="answerInput" placeholder="Enter number you see">
+
+    <button onclick="nextQuestion()">Next</button>
+
+  </div>
+</section>
+
+  <div class="bubbles">
+    <span></span><span></span><span></span>
+    <span></span><span></span><span></span>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
