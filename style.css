@@ -5,7 +5,8 @@ body {
   font-family: 'Segoe UI', sans-serif;
   color: white;
   text-align: center;
-  overflow-x: hidden;   /* FIXED */
+  overflow-x: hidden;
+  /* FIXED */
   background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1c1c3c);
   background-size: 400% 400%;
   animation: gradientMove 12s ease infinite;
@@ -17,9 +18,17 @@ html {
 
 /* Background Animation */
 @keyframes gradientMove {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 /* ================= FLOATING GLOW ================= */
@@ -50,13 +59,23 @@ body::after {
 }
 
 @keyframes float1 {
-  from { transform: translate(0,0); }
-  to { transform: translate(60px,60px); }
+  from {
+    transform: translate(0, 0);
+  }
+
+  to {
+    transform: translate(60px, 60px);
+  }
 }
 
 @keyframes float2 {
-  from { transform: translate(0,0); }
-  to { transform: translate(-60px,-60px); }
+  from {
+    transform: translate(0, 0);
+  }
+
+  to {
+    transform: translate(-60px, -60px);
+  }
 }
 
 /* ================= NAVBAR ================= */
@@ -101,8 +120,15 @@ nav {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(60px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(60px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ================= HEADING ================= */
@@ -126,6 +152,7 @@ h1 {
       0 4px 15px rgba(0, 0, 0, 0.6),
       0 0 15px rgba(255, 200, 60, 0.6);
   }
+
   to {
     text-shadow:
       0 4px 20px rgba(0, 0, 0, 0.7),
@@ -145,8 +172,13 @@ h1::after {
 }
 
 @keyframes expandLine {
-  from { width: 0; }
-  to { width: 120px; }
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 120px;
+  }
 }
 
 /* ================= TEXT ================= */
@@ -186,12 +218,10 @@ button::before {
   left: -120%;
   width: 120%;
   height: 100%;
-  background: linear-gradient(
-    120deg,
-    transparent,
-    rgba(255,255,255,0.4),
-    transparent
-  );
+  background: linear-gradient(120deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent);
   transition: 0.6s;
 }
 
@@ -233,18 +263,57 @@ input {
   border-radius: 50%;
   backdrop-filter: blur(5px);
   animation: rise 15s infinite ease-in;
-  box-shadow: 0 0 20px rgba(255,255,255,0.15);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
 }
 
-.bubbles span:nth-child(1) { left: 10%; animation-duration: 12s; }
-.bubbles span:nth-child(2) { left: 25%; animation-duration: 18s; width: 40px; height: 40px; }
-.bubbles span:nth-child(3) { left: 40%; animation-duration: 14s; }
-.bubbles span:nth-child(4) { left: 55%; animation-duration: 20s; width: 80px; height: 80px; }
-.bubbles span:nth-child(5) { left: 70%; animation-duration: 16s; }
-.bubbles span:nth-child(6) { left: 85%; animation-duration: 22s; width: 50px; height: 50px; }
+.bubbles span:nth-child(1) {
+  left: 10%;
+  animation-duration: 12s;
+}
+
+.bubbles span:nth-child(2) {
+  left: 25%;
+  animation-duration: 18s;
+  width: 40px;
+  height: 40px;
+}
+
+.bubbles span:nth-child(3) {
+  left: 40%;
+  animation-duration: 14s;
+}
+
+.bubbles span:nth-child(4) {
+  left: 55%;
+  animation-duration: 20s;
+  width: 80px;
+  height: 80px;
+}
+
+.bubbles span:nth-child(5) {
+  left: 70%;
+  animation-duration: 16s;
+}
+
+.bubbles span:nth-child(6) {
+  left: 85%;
+  animation-duration: 22s;
+  width: 50px;
+  height: 50px;
+}
 
 @keyframes rise {
-  0% { transform: translateY(0); opacity: 0; }
-  20% { opacity: 1; }
-  100% { transform: translateY(-1200px); opacity: 0; }
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-1200px);
+    opacity: 0;
+  }
 }

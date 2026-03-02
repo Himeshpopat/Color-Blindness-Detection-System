@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Ishihara Test</title>
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
   <nav>
@@ -11,19 +13,23 @@
   </nav>
 
   <section class="hero">
-  <h1>Ishihara Test</h1>
-  <p id="questionCount">Question 1 of 3</p>
+    <h1>Ishihara Test</h1>
+    <p id="questionCount">Question 1 of 10</p>
 
-  <div class="test-content">
+    <div class="progress-container">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
 
-    <img id="plateImage" src="images/test1.png" width="300">
+    <div class="test-content">
 
-    <input type="text" id="answerInput" placeholder="Enter number you see">
+      <img id="plateImage" src="images/test1.png" width="300" alt="Ishihara Plate">
 
-    <button onclick="nextQuestion()">Next</button>
+      <input type="text" id="answerInput" placeholder="Enter number you see">
 
-  </div>
-</section>
+      <button onclick="nextQuestion()">Next</button>
+
+    </div>
+  </section>
 
   <div class="bubbles">
     <span></span><span></span><span></span>
@@ -32,4 +38,5 @@
 
   <script src="script.js"></script>
 </body>
+
 </html>
