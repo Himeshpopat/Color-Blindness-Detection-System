@@ -32,6 +32,7 @@
             animation: cardEntry 1s ease forwards;
             opacity: 0;
             transform-style: preserve-3d;
+            text-align: center;
         }
 
         /* Entry animation */
@@ -53,7 +54,7 @@
             box-shadow: 0 35px 80px rgba(0, 0, 0, 0.7);
         }
 
-        /* Animated Gradient Border */
+        /* Animated Gradient Glow */
         .card::before {
             content: "";
             position: absolute;
@@ -72,12 +73,10 @@
             transition: 0.5s;
         }
 
-        /* Show glow on hover */
         .card:hover::before {
             opacity: 1;
         }
 
-        /* Moving border animation */
         @keyframes borderMove {
             0% {
                 background-position: 0% 50%;
@@ -120,30 +119,6 @@
             }
 
             50% {
-                transform: translateY(-10px);
-            }
-
-            100% {
-                transform: translateY(0);
-            }
-        }
-
-        .card:hover::before {
-            opacity: 1;
-        }
-
-        .icon {
-            font-size: 50px;
-            margin-bottom: 20px;
-            animation: floatIcon 3s ease-in-out infinite;
-        }
-
-        @keyframes floatIcon {
-            0% {
-                transform: translateY(0);
-            }
-
-            50% {
                 transform: translateY(-8px);
             }
 
@@ -157,36 +132,23 @@
                 grid-template-columns: 1fr;
             }
         }
-
-        nav {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px 40px;
-        }
-
-        .nav-right button {
-            padding: 10px 25px;
-            border-radius: 30px;
-            border: none;
-            background: linear-gradient(45deg, #4facfe, #6a11cb);
-            color: white;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        .nav-right button:hover {
-            transform: scale(1.1);
-        }
     </style>
-
 </head>
 
 <body>
 
-    <nav>
-        <h2>Color Vision Detector</h2>
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
 
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="test.html">Test</a>
+            <a href="reports.html">Reports</a>
+            <a href="simulation.html">Simulation</a>
+            <a href="about.html">About</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="index.html">Logout</a>
+        </div>
     </nav>
 
     <section class="hero">
@@ -222,6 +184,10 @@
         <span></span><span></span><span></span>
     </div>
 
+    <footer class="footer">
+        © 2026 Color Vision Detector | Academic Project
+    </footer>
+
     <script>
         function goTest() {
             window.location.href = "test.html";
@@ -236,10 +202,24 @@
         }
 
         function goAbout() {
-            alert("About page coming next");
+            window.location.href = "about.html";
         }
     </script>
+    <script>
+        function toggleBW() {
+            document.body.classList.toggle("bw-mode");
 
+            if (document.body.classList.contains("bw-mode")) {
+                localStorage.setItem("mode", "bw");
+            } else {
+                localStorage.setItem("mode", "color");
+            }
+        }
+
+        if (localStorage.getItem("mode") === "bw") {
+            document.body.classList.add("bw-mode");
+        }
+    </script>
 </body>
 
 </html>

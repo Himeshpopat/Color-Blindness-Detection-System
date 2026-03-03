@@ -9,8 +9,18 @@
 <body>
 
   <!-- Navbar -->
-  <nav>
-    <h2>Color Vision Detector</h2>
+  <nav class="main-nav">
+    <div class="logo">Color Vision Detector</div>
+
+    <div class="nav-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="test.html">Test</a>
+      <a href="reports.html">Reports</a>
+      <a href="simulation.html">Simulation</a>
+      <a href="index.html">Logout</a>
+      <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+      <a href="about.html">About CVD</a>
+    </div>
   </nav>
 
   <!-- Hero Section -->
@@ -33,7 +43,24 @@
     <span></span>
     <span></span>
   </div>
+  <footer class="footer">
+    © 2026 Color Vision Detector | Academic Project
+  </footer>
+  <script>
+    function toggleBW() {
+      document.body.classList.toggle("bw-mode");
 
+      if (document.body.classList.contains("bw-mode")) {
+        localStorage.setItem("mode", "bw");
+      } else {
+        localStorage.setItem("mode", "color");
+      }
+    }
+
+    if (localStorage.getItem("mode") === "bw") {
+      document.body.classList.add("bw-mode");
+    }
+  </script>
 </body>
 
 </html>

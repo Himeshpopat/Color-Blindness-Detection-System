@@ -1,64 +1,98 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <title>Test Result</title>
-  <link rel="stylesheet" href="style.css">
+    <title>Test Result</title>
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-  <nav>
-    <h2>Color Vision Detector</h2>
-  </nav>
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
 
-  <section class="hero">
-    <h1>Your Result</h1>
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="test.html">Test</a>
+            <a href="reports.html">Reports</a>
+            <a href="simulation.html">Simulation</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="index.html">Logout</a>
+        </div>
+    </nav>
 
-    <p id="resultText"></p>
-    <p id="scoreText"></p>
+    <section class="hero">
+        <h1>Your Result</h1>
 
-    <button onclick="goHome()">Go to Home</button>
-  </section>
+        <p class="disclaimer">
+            This screening tool is intended for awareness purposes only and does not replace professional medical
+            diagnosis.
+        </p>
 
-  <div class="bubbles">
-    <span></span><span></span><span></span>
-    <span></span><span></span><span></span>
-  </div>
+        <p id="resultText"></p>
+        <p id="scoreText"></p>
 
-<script>
-  const result = localStorage.getItem("finalResult");
-  const score = parseInt(localStorage.getItem("normalScore"));
-  const total = parseInt(localStorage.getItem("totalQuestions"));
+        <button onclick="goHome()">Go to Home</button>
+    </section>
 
-  const percentage = Math.round((score / total) * 100);
+    <div class="bubbles">
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+    </div>
 
-  let message = "";
-  let severity = "";
+    <script>
+        const result = localStorage.getItem("finalResult");
+        const score = parseInt(localStorage.getItem("normalScore"));
+        const total = parseInt(localStorage.getItem("totalQuestions"));
 
-  if (percentage >= 80) {
-    severity = "No Color Vision Deficiency Detected";
-    message = "Your responses indicate normal color perception.";
-  } 
-  else if (percentage >= 50) {
-    severity = "Mild Color Vision Deficiency";
-    message = "You may have slight difficulty distinguishing certain colors.";
-  } 
-  else {
-    severity = "Possible Red-Green Color Vision Deficiency";
-    message = "Your answers suggest possible Protanopia or Deuteranopia.";
-  }
+        const percentage = Math.round((score / total) * 100);
 
-  document.getElementById("resultText").innerText = severity;
-  document.getElementById("scoreText").innerText =
-    "Score: " + score + " / " + total + " (" + percentage + "%)";
+        let message = "";
+        let severity = "";
 
-  const extra = document.createElement("p");
-  extra.innerText = message;
-  document.querySelector(".hero").appendChild(extra);
+        if (percentage >= 80) {
+            severity = "No Color Vision Deficiency Detected";
+            message = "Your responses indicate normal color perception.";
+        }
+        else if (percentage >= 50) {
+            severity = "Mild Color Vision Deficiency";
+            message = "You may have slight difficulty distinguishing certain colors.";
+        }
+        else {
+            severity = "Possible Red-Green Color Vision Deficiency";
+            message = "Your answers suggest possible Protanopia or Deuteranopia.";
+        }
 
-  function goHome() {
-    window.location.href = "index.html";
-  }
-</script>
+        document.getElementById("resultText").innerText = severity;
+        document.getElementById("scoreText").innerText =
+            "Score: " + score + " / " + total + " (" + percentage + "%)";
 
+        const extra = document.createElement("p");
+        extra.innerText = message;
+        document.querySelector(".hero").appendChild(extra);
+
+        function goHome() {
+            window.location.href = "index.html";
+        }
+    </script>
+    <footer class="footer">
+        © 2026 Color Vision Detector | Academic Project
+    </footer>
+    <script>
+        function toggleBW() {
+            document.body.classList.toggle("bw-mode");
+
+            if (document.body.classList.contains("bw-mode")) {
+                localStorage.setItem("mode", "bw");
+            } else {
+                localStorage.setItem("mode", "color");
+            }
+        }
+
+        if (localStorage.getItem("mode") === "bw") {
+            document.body.classList.add("bw-mode");
+        }
+    </script>
 </body>
+
 </html>

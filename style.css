@@ -317,3 +317,124 @@ input {
     opacity: 0;
   }
 }
+
+.main-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 50px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+}
+
+.nav-links a {
+  margin-left: 20px;
+  text-decoration: none;
+  color: white;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.nav-links a:hover {
+  color: #4facfe;
+}
+
+body {
+  animation: pageFade 0.6s ease;
+}
+
+@keyframes pageFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.disclaimer {
+  margin-top: 25px;
+  font-size: 13px;
+  opacity: 0.7;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.footer {
+  margin-top: 60px;
+  padding: 20px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+body {
+  animation: pageFade 0.5s ease;
+}
+
+@keyframes pageFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.mode-btn {
+  margin-left: 15px;
+  padding: 6px 15px;
+  border-radius: 20px;
+  border: none;
+  background: linear-gradient(45deg, #444, #222);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+body.bw-mode {
+  filter: grayscale(100%);
+}
+
+/* ===== TRUE BLACK & WHITE MODE ===== */
+
+body.bw-mode {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* Remove gradients */
+body.bw-mode * {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Cards */
+body.bw-mode .card,
+body.bw-mode .about-card,
+body.bw-mode .report-card,
+body.bw-mode .stat-card,
+body.bw-mode .hero {
+  background: #111 !important;
+  border: 1px solid #444;
+}
+
+/* Buttons */
+body.bw-mode button {
+  background: #222 !important;
+  color: #fff !important;
+  border: 1px solid #555;
+}
+
+/* Navbar */
+body.bw-mode .main-nav {
+  background: #000 !important;
+  border-bottom: 1px solid #444;
+}
+
+/* Links */
+body.bw-mode a {
+  color: #fff !important;
+}
