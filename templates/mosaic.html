@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Mosaic Color Blindness Test</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <style>
+        .mosaic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .mosaic-card {
+            padding: 20px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+        }
+
+        .mosaic-tile {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-auto-rows: 26px;
+            gap: 4px;
+            margin-bottom: 15px;
+        }
+
+        .mosaic-tile span {
+            border-radius: 6px;
+        }
+
+        /* Foreground / background colors for red‑green oriented plates */
+        .mosaic-fg-rg {
+            background: #ff7675;
+        }
+
+        .mosaic-bg-rg {
+            background: #55efc4;
+        }
+
+        /* Foreground / background colors for blue‑yellow oriented plates */
+        .mosaic-fg-by {
+            background: #74b9ff;
+        }
+
+        .mosaic-bg-by {
+            background: #ffeaa7;
+        }
+
+        .mosaic-input {
+            margin-top: 8px;
+        }
+
+        .mosaic-input input {
+            width: 120px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
+
+        <div class="nav-links">
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('test') }}">Test</a>
+            <a href="{{ url_for('mosaic') }}">Mosaic Test</a>
+            <a href="{{ url_for('reports') }}">Reports</a>
+            <a href="{{ url_for('simulation') }}">Simulation</a>
+            <a href="{{ url_for('about') }}">About</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="{{ url_for('index') }}">Logout</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <h1>Mosaic Color Blindness Test</h1>
+        <p>
+            Each colored mosaic below hides a number. Enter the number you can see in each plate.
+        </p>
+
+        <form method="post" action="{{ url_for('submit_mosaic') }}">
+            <div class="mosaic-grid">
+                {% for q in questions %}
+                <div class="mosaic-card">
+                    <h3>{{ q.label }}</h3>
+                    <p style="font-size:14px; opacity:0.85;">{{ q.description }}</p>
+
+                    <!-- JS will fill this 6x6 grid and paint the digit using two color groups -->
+                    <div class="mosaic-tile" data-question-id="{{ q.id }}" data-type="{{ q.type }}"></div>
+
+                    <div class="mosaic-input">
+                        <input type="text" name="answer_{{ q.id }}" placeholder="Number you see">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <br>
+            <button type="submit">Submit Mosaic Answers</button>
+        </form>
+    </section>
+
+    <div class="bubbles">
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+    </div>
+
+    <footer class="footer">
+        © 2026 Color Vision Detector | Academic Project
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        function toggleBW() {
+            document.body.classList.toggle("bw-mode");
+
+            if (document.body.classList.contains("bw-mode")) {
+                localStorage.setItem("mode", "bw");
+            } else {
+                localStorage.setItem("mode", "color");
+            }
+        }
+
+        if (localStorage.getItem("mode") === "bw") {
+            document.body.classList.add("bw-mode");
+        }
+    </script>
+</body>
+
+</html>
+

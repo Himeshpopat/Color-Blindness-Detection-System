@@ -23,40 +23,43 @@ ISHIHARA_TOTAL_QUESTIONS = 10
 
 # ---- Mosaic test configuration ----
 
+# Each mosaic plate visually encodes a single digit (0–9) using
+# a 6x6 grid and two color groups (foreground vs background).
+
 MOSAIC_QUESTIONS = [
     {
         "id": 1,
         "label": "Mosaic Plate 1",
-        "description": "A green-red mosaic with a number hidden inside.",
-        "correct_answer": "12",
+        "description": "Red–green mosaic forming the digit 3.",
+        "correct_answer": "3",
         "type": "rg",  # red‑green oriented
     },
     {
         "id": 2,
         "label": "Mosaic Plate 2",
-        "description": "Warm‑tone tiles forming a digit pattern.",
+        "description": "Red–green mosaic forming the digit 5.",
         "correct_answer": "5",
         "type": "rg",
     },
     {
         "id": 3,
         "label": "Mosaic Plate 3",
-        "description": "Cool blue and yellow tiles with a number.",
+        "description": "Blue–yellow mosaic forming the digit 8.",
         "correct_answer": "8",
         "type": "by",  # blue‑yellow oriented
     },
     {
         "id": 4,
         "label": "Mosaic Plate 4",
-        "description": "Mixed color mosaic with a two‑digit number.",
-        "correct_answer": "26",
+        "description": "Red–green mosaic forming the digit 2.",
+        "correct_answer": "2",
         "type": "rg",
     },
     {
         "id": 5,
         "label": "Mosaic Plate 5",
-        "description": "High‑contrast blue and yellow grid pattern.",
-        "correct_answer": "3",
+        "description": "Blue–yellow mosaic forming the digit 9.",
+        "correct_answer": "9",
         "type": "by",
     },
 ]

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>My Reports</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- PDF (client‑side for historical data saved in browser) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+        }
+
+        .reports-container {
+            width: 85%;
+            margin: auto;
+        }
+
+        .report-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .progress {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4facfe, #6a11cb);
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: red;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        .clear-btn,
+        .pdf-btn {
+            margin: 15px 0;
+            padding: 10px 25px;
+            border-radius: 30px;
+            border: none;
+            background: linear-gradient(45deg, #4facfe, #6a11cb);
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
+        <div class="nav-links">
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('test') }}">Test</a>
+            <a href="{{ url_for('mosaic') }}">Mosaic Test</a>
+            <a href="{{ url_for('reports') }}">Reports</a>
+            <a href="{{ url_for('simulation') }}">Simulation</a>
+            <a href="{{ url_for('about') }}">About</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="{{ url_for('index') }}">Logout</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <h1>Reports Analytics (Browser History)</h1>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h2 id="totalTests">0</h2>
+                <p>Total Tests</p>
+            </div>
+            <div class="stat-card">
+                <h2 id="avgScore">0%</h2>
+                <p>Average Accuracy</p>
+            </div>
+            <div class="stat-card">
+                <h2 id="lastResult">-</h2>
+                <p>Last Result</p>
+            </div>
+        </div>
+
+        <button class="clear-btn" onclick="clearReports()">Clear All Reports</button>
+
+        <div style="width:85%; margin:40px auto;">
+            <canvas id="reportChart" height="120"></canvas>
+        </div>
+
+        <div class="reports-container" id="reportsContainer"></div>
+
+    </section>
+
+    <footer class="footer">
+        © 2026 Color Vision Detector | Academic Project
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+
+            let reports = JSON.parse(localStorage.getItem("reports")) || [];
+            const container = document.getElementById("reportsContainer");
+            const ctx = document.getElementById("reportChart").getContext("2d");
+            let chartInstance;
+
+            function loadReports() {
+                container.innerHTML = "";
+
+                if (reports.length === 0) {
+                    container.innerHTML = "<p>No reports available.</p>";
+                    document.getElementById("totalTests").innerText = 0;
+                    document.getElementById("avgScore").innerText = "0%";
+                    document.getElementById("lastResult").innerText = "-";
+                } else {
+
+                    let totalPercent = 0;
+
+                    reports.forEach((report, index) => {
+                        const percentValue = parseInt(report.percentage);
+                        totalPercent += percentValue;
+
+                        container.innerHTML += `
+                <div class="report-card">
+                    <button class="delete-btn" onclick="deleteReport(${index})">Delete</button>
+                    <h3>${report.result}</h3>
+                    <p><strong>Score:</strong> ${report.score}</p>
+                    <p><strong>Accuracy:</strong> ${report.percentage}</p>
+                    <p><strong>Date:</strong> ${report.date}</p>
+                    <div class="progress">
+                        <div class="progress-bar" style="width:${percentValue}%"></div>
+                    </div>
+                    <button class="pdf-btn" onclick="downloadPDF(${index})">
+                        Download PDF
+                    </button>
+                </div>
+                `;
+                    });
+
+                    document.getElementById("totalTests").innerText = reports.length;
+                    document.getElementById("avgScore").innerText =
+                        Math.round(totalPercent / reports.length) + "%";
+                    document.getElementById("lastResult").innerText =
+                        reports[reports.length - 1].result;
+                }
+
+                loadChart();
+            }
+
+            function loadChart() {
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+
+                const scores = reports.length === 0
+                    ? [0]
+                    : reports.map(r => parseInt(r.percentage));
+
+                const labels = reports.length === 0
+                    ? ["No Data"]
+                    : reports.map((r, i) => "Test " + (i + 1));
+
+                chartInstance = new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "Accuracy (%)",
+                            data: scores,
+                            backgroundColor: scores.map(score =>
+                                score >= 80 ? "rgba(0,255,150,0.8)" :
+                                    score >= 50 ? "rgba(255,200,0,0.8)" :
+                                        "rgba(255,80,80,0.8)"
+                            ),
+                            borderRadius: 12,
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: "white",
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: "white"
+                                },
+                                grid: {
+                                    color: "rgba(255,255,255,0.1)"
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    color: "white"
+                                },
+                                grid: {
+                                    color: "rgba(255,255,255,0.1)"
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            window.deleteReport = function (index) {
+                reports.splice(index, 1);
+                localStorage.setItem("reports", JSON.stringify(reports));
+                loadReports();
+            };
+
+            window.clearReports = function () {
+                localStorage.removeItem("reports");
+                reports = [];
+                loadReports();
+            };
+
+            window.downloadPDF = function (index) {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const report = reports[index];
+
+                doc.text("Color Vision Diagnostic Report", 20, 20);
+                doc.text("Score: " + report.score, 20, 40);
+                doc.text("Accuracy: " + report.percentage, 20, 50);
+                doc.text("Result: " + report.result, 20, 60);
+                doc.text("Date: " + report.date, 20, 70);
+
+                doc.save("CVD_Report.pdf");
+            };
+
+            loadReports();
+        });
+
+        function toggleBW() {
+            document.body.classList.toggle("bw-mode");
+
+            if (document.body.classList.contains("bw-mode")) {
+                localStorage.setItem("mode", "bw");
+            } else {
+                localStorage.setItem("mode", "color");
+            }
+        }
+
+        if (localStorage.getItem("mode") === "bw") {
+            document.body.classList.add("bw-mode");
+        }
+    </script>
+
+</body>
+
+</html>
+

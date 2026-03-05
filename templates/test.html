@@ -3,7 +3,7 @@
 
 <head>
   <title>Ishihara Test</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
@@ -12,18 +12,20 @@
     <div class="logo">Color Vision Detector</div>
 
     <div class="nav-links">
-      <a href="dashboard.html">Dashboard</a>
-      <a href="test.html">Test</a>
-      <a href="reports.html">Reports</a>
-      <a href="simulation.html">Simulation</a>
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('test') }}">Test</a>
+      <a href="{{ url_for('reports') }}">Reports</a>
+      <a href="{{ url_for('simulation') }}">Simulation</a>
+      <a href="{{ url_for('about') }}">About</a>
+      <a href="{{ url_for('mosaic') }}">Mosaic Test</a>
       <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
-      <a href="index.html">Logout</a>
+      <a href="{{ url_for('index') }}">Logout</a>
     </div>
   </nav>
 
   <section class="hero">
     <h1>Ishihara Test</h1>
-    <p id="questionCount">Question 1 of 10</p>
+    <p id="questionCount">Question 1 of {{ total_questions }}</p>
 
     <div class="progress-container">
       <div id="progressBar" class="progress-bar"></div>
@@ -31,7 +33,6 @@
 
     <div class="test-content">
 
-      <!-- Updated path example for Flask static usage -->
       <img id="plateImage" src="{{ url_for('static', filename='images/test1.png') }}" width="300"
         alt="Ishihara Plate">
 
@@ -40,6 +41,15 @@
       <button onclick="nextQuestion()">Next</button>
 
     </div>
+
+    <!-- Hidden form to send Ishihara scores to Flask backend -->
+    <form id="ishiharaForm" action="{{ url_for('ishihara_submit') }}" method="post" style="display:none;">
+      <input type="hidden" id="normalScoreField" name="normalScore" value="0">
+      <input type="hidden" id="protanScoreField" name="protanScore" value="0">
+      <input type="hidden" id="deutanScoreField" name="deutanScore" value="0">
+      <input type="hidden" id="totalQuestionsField" name="totalQuestions" value="{{ total_questions }}">
+    </form>
+
   </section>
 
   <div class="bubbles">
@@ -47,10 +57,11 @@
     <span></span><span></span><span></span>
   </div>
 
-  <script src="script.js"></script>
   <footer class="footer">
     © 2026 Color Vision Detector | Academic Project
   </footer>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
   <script>
     function toggleBW() {
       document.body.classList.toggle("bw-mode");
@@ -69,3 +80,4 @@
 </body>
 
 </html>
+
