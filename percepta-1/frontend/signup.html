@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign Up - Color Vision Detector</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Floating Glow Orbs -->
+    <div class="glow-orbs">
+        <div class="glow-orb orb1"></div>
+        <div class="glow-orb orb2"></div>
+    </div>
+    <!-- Navbar -->
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+        </div>
+    </nav>
+    <!-- Sign Up Form -->
+    <div class="form-container">
+        <h1>Create Account</h1>
+        <p style="margin-bottom: 25px; font-size: 15px;">Sign up to start your color vision test</p>
+        <form id="signupForm" onsubmit="handleSignup(event)">
+            <div class="form-group">
+                <label>Full Name</label>
+                <div class="input-icon name-icon">
+                    <input type="text" id="signupName" placeholder="Enter your full name" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Age</label>
+                <div class="input-icon age-icon">
+                    <input type="number" id="signupAge" placeholder="Enter your age" min="1" max="150" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Username</label>
+                <div class="input-icon username-icon">
+                    <input type="text" id="signupUsername" placeholder="Choose a username" required>
+                </div>
+                <p class="error-msg" id="usernameError">Username already exists!</p>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <div class="input-icon email-icon">
+                    <input type="email" id="signupEmail" placeholder="Enter your email" required>
+                </div>
+                <p class="error-msg" id="emailError">Email already registered!</p>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <div class="input-icon password-icon">
+                    <input type="password" id="signupPassword" placeholder="Create a password" required minlength="4">
+                </div>
+            </div>
+            <button type="submit" class="form-btn">Sign Up</button>
+        </form>
+        <p class="form-footer">
+            Already have an account? <a href="login.html">Login</a>
+        </p>
+    </div>
+    <!-- Bubbles Animation -->
+    <div class="bubbles">
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+    </div>
+    <footer class="footer">
+        © 2026 Color Vision Detector | Academic Project
+    </footer>
+    <script>
+    async function handleSignup(event) {
+        event.preventDefault();
+        const name = document.getElementById('signupName').value.trim();
+        const age = document.getElementById('signupAge').value.trim();
+        const username = document.getElementById('signupUsername').value.trim();
+        const email = document.getElementById('signupEmail').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        const usernameError = document.getElementById('usernameError');
+        const emailError = document.getElementById('emailError');
+        // Hide previous errors
+        usernameError.style.display = 'none';
+        emailError.style.display = 'none';
+        try {
+            const response = await fetch("http://127.0.0.1:5000/signup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, age, username, email, password })
+            });
+            const result = await response.json();
+            if (response.ok) {
+                alert("Account created successfully! Please login.");
+                window.location.href = "login.html";
+            } else {
+                if (result.error && result.error.includes("Username")) {
+                    usernameError.style.display = "block";
+                } else if (result.error && result.error.includes("Email")) {
+                    emailError.style.display = "block";
+                } else {
+                    alert(result.error || "Signup failed");
+                }
+            }
+        } catch (err) {
+            console.error("Signup failed:", err);
+            alert("Something went wrong. Please try again later.");
+        }
+    }
+    function toggleBW() {
+        document.body.classList.toggle("bw-mode");
+        if (document.body.classList.contains("bw-mode")) {
+            localStorage.setItem("mode", "bw");
+        } else {
+            localStorage.setItem("mode", "color");
+        }
+    }
+    if (localStorage.getItem("mode") === "bw") {
+        document.body.classList.add("bw-mode");
+    }
+    </script>
+</body>
+</html>

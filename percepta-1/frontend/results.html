@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Result | Percepta</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="test.html">Test</a>
+            <a href="reports.html">Reports</a>
+            <a href="simulation.html">Simulation</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="index.html" onclick="logout()">Logout</a>
+        </div>
+    </nav>
+    <section class="hero">
+        <h1>Your Diagnostic Result</h1>
+        <p class="disclaimer">
+            This screening tool is for awareness purposes only and does not replace a professional medical diagnosis.
+        </p>
+        <div class="result-container">
+            <div id="severityBadge" class="severity-badge">Fetching Results...</div>
+            <h2 id="scoreDisplay" class="score-large">-- / --</h2>
+            <p id="percentageText" class="percentage-display"></p>
+            <div class="info-card">
+                <p id="messageText" class="info-text">Please wait while we retrieve your latest diagnostic data.</p>
+            </div>
+            <div class="action-buttons">
+                <button onclick="window.location.href='test.html'">Retake Test</button>
+                <button onclick="window.location.href='dashboard.html'" class="secondary-btn">Back to Dashboard</button>
+            </div>
+        </div>
+    </section>
+    <div class="bubbles">
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+    </div>
+    <script>
+    async function loadLatestResult() {
+        // 1. Identify the user (using sessionStorage as the bridge)
+        const username = sessionStorage.getItem("username") || localStorage.getItem("username");
+        if (!username) {
+            document.getElementById("messageText").innerText = "User not identified. Please login to view results.";
+            return;
+        }
+        try {
+            // 2. Fetch all reports for this user from the DB
+            const response = await fetch(`http://127.0.0.1:5000/api/get_reports/${username}`);
+            if (!response.ok) throw new Error("Failed to fetch reports");
+            const reports = await response.json();
+            if (reports.length === 0) {
+                document.getElementById("severityBadge").innerText = "No Data";
+                document.getElementById("messageText").innerText = "No previous test results found in our database.";
+                return;
+            }
+            // 3. Get the latest report (The API already sorts by ID descending)
+            const latest = reports[0];
+            // 4. Update UI Elements
+            const badge = document.getElementById("severityBadge");
+            const scoreDisplay = document.getElementById("scoreDisplay");
+            const messageText = document.getElementById("messageText");
+            const percentageText = document.getElementById("percentageText");
+            scoreDisplay.innerText = latest.score;
+            percentageText.innerText = `Accuracy Rate: ${latest.percentage}`;
+            badge.innerText = latest.result;
+            // Set description based on the result stored in DB
+            messageText.innerText = `This result was recorded on ${latest.date}. If you feel this is inaccurate, please retake the test in a well-lit environment.`;
+            // 5. Dynamic Styling based on the percentage string (e.g., "85%")
+            const numericPercent = parseInt(latest.percentage);
+            if (numericPercent >= 80) {
+                badge.style.backgroundColor = "#2ecc71"; // Green
+                badge.style.color = "#ffffff";
+            } else if (numericPercent >= 50) {
+                badge.style.backgroundColor = "#f1c40f"; // Yellow
+                badge.style.color = "#2c3e50";
+            } else {
+                badge.style.backgroundColor = "#e74c3c"; // Red
+            }
+        } catch (err) {
+            console.error("Error loading results:", err);
+            document.getElementById("severityBadge").innerText = "Error";
+            document.getElementById("messageText").innerText = "Failed to connect to the database.";
+        }
+    }
+    function logout() {
+        sessionStorage.clear();
+        localStorage.clear();
+        window.location.href = 'index.html';
+    }
+    function toggleBW() {
+        document.body.classList.toggle("bw-mode");
+    }
+    // Call fetch on load
+    window.onload = loadLatestResult;
+    </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+    <!DOCTYPE html>
+    <html>
+
+    <head>
+    <title>Color Vision Test</title>
+    <link rel="stylesheet" href="style.css">
+    </head>
+
+    <body>
+
+    <!-- Navbar -->
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
+
+        <div class="nav-links">
+        <a href="login.html">Login</a>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="test.html">Test</a>
+        <a href="reports.html">Reports</a>
+        <a href="simulation.html">Simulation</a>
+        <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+        <a href="about.html">About CVD</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1>Color Vision Deficiency Detection</h1>
+        <p>Take a quick Ishihara test and analyze your vision.</p>
+        <button onclick="window.location.href='test.html'">
+        Start Test
+        </button>
+    </section>
+
+    <!-- Bubbles Animation -->
+    <div class="bubbles">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+    </div>
+    <footer class="footer">
+        © 2026 Color Vision Detector | Academic Project
+    </footer>
+    <script>
+        function toggleBW() {
+        document.body.classList.toggle("bw-mode");
+
+        if (document.body.classList.contains("bw-mode")) {
+            localStorage.setItem("mode", "bw");
+        } else {
+            localStorage.setItem("mode", "color");
+        }
+        }
+
+        if (localStorage.getItem("mode") === "bw") {
+        document.body.classList.add("bw-mode");
+        }
+    </script>
+    </body>
+
+    </html>

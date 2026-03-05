@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Color Vision Simulation</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <nav class="main-nav">
+            <div class="logo">Color Vision Detector</div>
+            <div class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="test.html">Test</a>
+                <a href="reports.html">Reports</a>
+                <a href="simulation.html">Simulation</a>
+                <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+                <a href="index.html">Logout</a>
+            </div>
+        </nav>
+        <section class="hero sim-wrapper">
+            <h1>Color Vision Simulation</h1>
+            <label class="upload-box">
+                Click to Upload Image
+                <input type="file" id="imageUpload" hidden>
+            </label>
+            <div class="controls">
+                <select id="visionType">
+                    <option value="normal">Normal Vision</option>
+                    <option value="protanopia">Protanopia</option>
+                    <option value="deuteranopia">Deuteranopia</option>
+                </select>
+                <button type="button" onclick="applyFilter()">Apply</button>
+                <button type="button" onclick="resetImage()">Reset</button>
+            </div>
+            <div class="image-grid">
+                <div class="image-box">
+                    <h3>Original</h3>
+                    <img id="originalImage">
+                </div>
+                <div class="image-box">
+                    <h3>Simulated</h3>
+                    <img id="simulatedImage">
+                </div>
+            </div>
+            <p class="disclaimer">
+                Simulation results are approximate and for educational demonstration only.
+            </p>
+        </section>
+        <div class="bubbles">
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+        </div>
+        <script>
+            const upload = document.getElementById("imageUpload");
+            const original = document.getElementById("originalImage");
+            const simulated = document.getElementById("simulatedImage");
+            upload.addEventListener("change", function () {
+                const file = this.files[0];
+                if (file) {
+                    const url = URL.createObjectURL(file);
+                    original.src = url;
+                    simulated.src = url;
+                }
+            });
+            function applyFilter() {
+                const type = document.getElementById("visionType").value;
+                if (type === "normal") {
+                    simulated.style.filter = "none";
+                }
+                if (type === "protanopia") {
+                    simulated.style.filter =
+                        "grayscale(30%) sepia(40%) hue-rotate(-20deg)";
+                }
+                if (type === "deuteranopia") {
+                    simulated.style.filter =
+                        "grayscale(40%) sepia(20%) hue-rotate(20deg)";
+                }
+            }
+            function resetImage() {
+                simulated.style.filter = "none";
+                document.getElementById("visionType").value = "normal";
+            }
+        </script>
+        <footer class="footer">
+            © 2026 Color Vision Detector | Academic Project
+        </footer>
+        <script>
+            function toggleBW() {
+                document.body.classList.toggle("bw-mode");
+                if (document.body.classList.contains("bw-mode")) {
+                    localStorage.setItem("mode", "bw");
+                } else {
+                    localStorage.setItem("mode", "color");
+                }
+            }
+            if (localStorage.getItem("mode") === "bw") {
+                document.body.classList.add("bw-mode");
+            }
+        </script>
+    </body>
+    </html>

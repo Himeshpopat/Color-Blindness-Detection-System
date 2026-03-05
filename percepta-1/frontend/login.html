@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - Color Vision Detector</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .form-container {
+            margin: 100px auto;
+            width: 90%;
+            max-width: 450px;
+            padding: 50px 40px;
+            border-radius: 25px;
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 1s ease;
+            position: relative;
+            z-index: 2;
+            text-align: center;
+        }
+        .form-group { margin-bottom: 20px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 14px; color: #ccc; }
+        .form-group input {
+            width: 100%; padding: 15px 20px; border-radius: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.1);
+            color: white; box-sizing: border-box;
+        }
+        .form-btn { width: 100%; padding: 16px; border-radius: 30px; border: none; background: #4facfe; color: white; cursor: pointer; }
+        .error-msg { color: #ff6b6b; font-size: 13px; margin-top: 5px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Welcome</h1>
+        <p style="margin-bottom: 30px; color: #ccc;">Login to access your dashboard</p>
+        <form id="loginForm">
+            <div class="form-group">
+                <label>Username or Email</label>
+                <input type="text" id="loginIdentifier" placeholder="Enter username or email" required>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter password" required>
+                <p class="error-msg" id="loginError">Invalid credentials. Please try again.</p>
+            </div>
+            <button type="submit" class="form-btn" id="submitBtn">Login</button>
+        </form>
+        <p style="margin-top: 20px; color: #ccc;">
+            Don't have an account? <a href="signup.html" style="color: #4facfe;">Sign Up</a>
+        </p>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const identifier = document.getElementById('loginIdentifier').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorMsg = document.getElementById('loginError');
+            const submitBtn = document.getElementById('submitBtn');
+
+            submitBtn.innerText = "Authenticating...";
+            submitBtn.disabled = true;
+
+            try {
+                // Send the credentials to the Flask backend
+                const response = await fetch("http://127.0.0.1:5000/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        username: identifier, // Backend expects 'username'
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store user session info for subsequent test requests
+                    localStorage.setItem('username', data.username);
+                    localStorage.setItem('currentUser', JSON.stringify(data));
+                    window.location.href = 'dashboard.html';
+                } else {
+                    throw new Error(data.error || "Login failed");
+                }
+            } catch (err) {
+                errorMsg.style.display = 'block';
+                errorMsg.innerText = err.message;
+                submitBtn.innerText = "Login";
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        .dashboard-title {
+            margin-bottom: 20px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            margin-top: 50px;
+        }
+
+        /* CARD BASE */
+        .card {
+            padding: 60px;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(25px);
+            cursor: pointer;
+            font-size: 22px;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.5s ease;
+            animation: cardEntry 1s ease forwards;
+            opacity: 0;
+            transform-style: preserve-3d;
+            text-align: center;
+        }
+
+        /* Entry animation */
+        @keyframes cardEntry {
+            from {
+                transform: translateY(60px) rotateX(20deg);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0) rotateX(0deg);
+                opacity: 1;
+            }
+        }
+
+        /* 3D Hover */
+        .card:hover {
+            transform: translateY(-12px) scale(1.07) rotateX(5deg);
+            box-shadow: 0 35px 80px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Animated Gradient Glow */
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: -3px;
+            border-radius: 30px;
+            background: linear-gradient(45deg,
+                    #00f2fe,
+                    #4facfe,
+                    #6a11cb,
+                    #00f2fe);
+            background-size: 300% 300%;
+            animation: borderMove 6s linear infinite;
+            z-index: -1;
+            filter: blur(25px);
+            opacity: 0;
+            transition: 0.5s;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        @keyframes borderMove {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            100% {
+                background-position: 100% 50%;
+            }
+        }
+
+        /* Shine sweep */
+        .card::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -120%;
+            width: 120%;
+            height: 100%;
+            background: linear-gradient(120deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.3),
+                    transparent);
+            transition: 0.8s;
+        }
+
+        .card:hover::after {
+            left: 120%;
+        }
+
+        /* Icon animation */
+        .icon {
+            font-size: 55px;
+            margin-bottom: 25px;
+            animation: floatIcon 3s ease-in-out infinite;
+        }
+
+        @keyframes floatIcon {
+            0% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+
+            100% {
+                transform: translateY(0);
+            }
+        }
+
+        @media(max-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
+
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="test.html">Test</a>
+            <a href="reports.html">Reports</a>
+            <a href="simulation.html">Simulation</a>
+            <a href="about.html">About</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="index.html">Logout</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <h1 class="dashboard-title">Dashboard</h1>
+
+        <div class="dashboard-grid">
+
+            <div class="card" onclick="goTest()">
+                <div class="icon">🧪</div>
+                Take Test
+            </div>
+
+            <div class="card" onclick="goReports()">
+                <div class="icon">📊</div>
+                My Reports
+            </div>
+
+            <div class="card" onclick="goSimulation()">
+                <div class="icon">🎨</div>
+                Simulation
+            </div>
+
+            <div class="card" onclick="goAbout()">
+                <div class="icon">📘</div>
+                About CVD
+            </div>
+
+        </div>
+    </section>
+
+    <div class="bubbles">
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+    </div>
+
+    <footer class="footer">
+        © 2026 Color Vision Detector | Academic Project
+    </footer>
+
+    <script>
+        function goTest() {
+            window.location.href = "test.html";
+        }
+
+        function goReports() {
+            window.location.href = "reports.html";
+        }
+
+        function goSimulation() {
+            window.location.href = "simulation.html";
+        }
+
+        function goAbout() {
+            window.location.href = "about.html";
+        }
+    </script>
+    <script>
+        function toggleBW() {
+            document.body.classList.toggle("bw-mode");
+
+            if (document.body.classList.contains("bw-mode")) {
+                localStorage.setItem("mode", "bw");
+            } else {
+                localStorage.setItem("mode", "color");
+            }
+        }
+
+        if (localStorage.getItem("mode") === "bw") {
+            document.body.classList.add("bw-mode");
+        }
+    </script>
+</body>
+
+</html>

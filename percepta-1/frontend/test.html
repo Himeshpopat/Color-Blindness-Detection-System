@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ishihara Test</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="test.html">Test</a>
+            <a href="reports.html">Reports</a>
+            <a href="simulation.html">Simulation</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="index.html">Logout</a>
+        </div>
+    </nav>
+    <section class="hero">
+        <h1>Ishihara Test</h1>
+        <p id="questionCount">Loading test...</p>
+        <div class="progress-container">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div class="test-content">
+            <img id="plateImage" src="" width="300" alt="Ishihara Plate" style="border-radius: 50%; background: white; padding: 10px;">
+            <input type="text" id="answerInput" placeholder="Enter number you see">
+            <button onclick="nextQuestion()">Next</button>
+        </div>
+    </section>
+    <script src="script.js"></script>
+    <script>
+        // Initialize test on page load
+        window.onload = startTest;
+        function toggleBW() {
+            document.body.classList.toggle("bw-mode");
+            localStorage.setItem("mode", document.body.classList.contains("bw-mode") ? "bw" : "color");
+        }
+        if (localStorage.getItem("mode") === "bw") {
+            document.body.classList.add("bw-mode");
+        }
+    </script>
+</body>
+</html>
