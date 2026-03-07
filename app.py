@@ -1,5 +1,8 @@
 from datetime import datetime
 import io
+import json
+import sqlite3
+import os
 
 from flask import (
     Flask,
@@ -14,6 +17,76 @@ from flask import (
 
 app = Flask(__name__)
 app.secret_key = "change-this-secret-key"  # required for session usage
+
+# Database path
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_results.db")
+
+
+def init_db():
+    """Initialize SQLite database and create tables if they don't exist."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS test_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            test_type TEXT NOT NULL,
+            score INTEGER NOT NULL,
+            total_questions INTEGER NOT NULL,
+            diagnosis TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            answers_json TEXT,
+            report_data TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def save_test_result(test_type: str, score: int, total: int, diagnosis: str,
+                     answers_json: str = None, report_data: dict = None) -> int:
+    """Save a test result to the database. Returns the new row id."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    report_str = json.dumps(report_data) if report_data else None
+    c.execute(
+        "INSERT INTO test_results (test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (test_type, score, total, diagnosis, ts, answers_json, report_str),
+    )
+    row_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return row_id
+
+
+def get_all_test_results():
+    """Fetch all test results from the database."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data FROM test_results ORDER BY id DESC"
+    )
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def get_test_result_by_id(result_id: int) -> dict | None:
+    """Fetch a single test result by id."""
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data FROM test_results WHERE id = ?",
+        (result_id,),
+    )
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 # ---- Ishihara configuration ----
@@ -86,22 +159,19 @@ def diagnose_mosaic_result(summary: dict) -> str:
 
 
 def build_ishihara_diagnosis(normal_score: int, protan_score: int, deutan_score: int, total: int) -> str:
-    """Server‑side interpretation of Ishihara style scores."""
+    """Server-side interpretation of Ishihara scores.
+    score >= 8: Normal Color Vision
+    score 5-7: Possible Red-Green Deficiency
+    score < 5: High probability of Color Vision Deficiency
+    """
     if total <= 0:
         return "Insufficient data to determine result."
 
-    percentage = normal_score / total
-
-    if percentage >= 0.8:
-        return "No Color Vision Deficiency Detected"
-
-    if protan_score > deutan_score:
-        return "Possible Protanopia (red‑weak / red‑blind)"
-
-    if deutan_score > protan_score:
-        return "Possible Deuteranopia (green‑weak / green‑blind)"
-
-    return "Non‑specific Color Vision Difference"
+    if normal_score >= 8:
+        return "Normal Color Vision"
+    if 5 <= normal_score <= 7:
+        return "Possible Red-Green Deficiency"
+    return "High probability of Color Vision Deficiency"
 
 
 def store_report(report: dict) -> None:
@@ -132,8 +202,16 @@ def about():
 
 @app.route("/reports")
 def reports():
-    # Existing analytics page; currently still mostly client‑side.
-    return render_template("reports.html")
+    tests = get_all_test_results()
+    ishihara_count = sum(1 for t in tests if t.get("test_type") == "ishihara")
+    mosaic_count = sum(1 for t in tests if t.get("test_type") == "mosaic")
+    return render_template(
+        "reports.html",
+        tests=tests,
+        total_count=len(tests),
+        ishihara_count=ishihara_count,
+        mosaic_count=mosaic_count,
+    )
 
 
 @app.route("/simulation")
@@ -203,12 +281,20 @@ def submit_mosaic():
     }
 
     store_report(report)
+    save_test_result(
+        test_type="mosaic",
+        score=correct_count,
+        total=len(MOSAIC_QUESTIONS),
+        diagnosis=diagnosis,
+        answers_json=json.dumps(details),
+        report_data=report,
+    )
     return redirect(url_for("result"))
 
 
 @app.route("/ishihara-submit", methods=["POST"])
 def ishihara_submit():
-    """Receive Ishihara scores from the front‑end and evaluate in Python."""
+    """Receive Ishihara scores from the front-end and evaluate in Python."""
     try:
         normal_score = int(request.form.get("normalScore", "0"))
         protan_score = int(request.form.get("protanScore", "0"))
@@ -217,6 +303,14 @@ def ishihara_submit():
     except ValueError:
         normal_score = protan_score = deutan_score = 0
         total_questions = ISHIHARA_TOTAL_QUESTIONS
+
+    # Parse per-question answers from frontend
+    answers_list = []
+    try:
+        answers_json = request.form.get("answersJson", "[]")
+        answers_list = json.loads(answers_json) if answers_json else []
+    except (json.JSONDecodeError, TypeError):
+        pass
 
     diagnosis = build_ishihara_diagnosis(normal_score, protan_score, deutan_score, total_questions)
     percentage = round((normal_score / total_questions) * 100) if total_questions else 0
@@ -230,12 +324,26 @@ def ishihara_submit():
             "deutan_score": deutan_score,
             "total_questions": total_questions,
             "percentage": percentage,
+            "correct_count": normal_score,
+            "answers": answers_list,
+        },
+        "summary": {
+            "correct": normal_score,
+            "total": total_questions,
         },
         "diagnosis": diagnosis,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
     store_report(report)
+    save_test_result(
+        test_type="ishihara",
+        score=normal_score,
+        total=total_questions,
+        diagnosis=diagnosis,
+        answers_json=json.dumps(answers_list),
+        report_data=report,
+    )
     return redirect(url_for("result"))
 
 
@@ -243,16 +351,83 @@ def ishihara_submit():
 def result():
     report = session.get("last_report")
     if not report:
-        # Fallback: if no report, send user to home.
         return redirect(url_for("index"))
     return render_template("result.html", report=report)
 
 
+@app.route("/report/<int:report_id>")
+def report_detail(report_id):
+    """View full report for a specific test result."""
+    row = get_test_result_by_id(report_id)
+    if not row:
+        return redirect(url_for("reports"))
+    report_data = None
+    if row.get("report_data"):
+        try:
+            report_data = json.loads(row["report_data"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    if not report_data:
+        report_data = {
+            "test_name": f"{row['test_type'].title()} Test",
+            "kind": row["test_type"],
+            "diagnosis": row["diagnosis"],
+            "timestamp": row["timestamp"],
+            "details": {
+                "normal_score": row["score"],
+                "total_questions": row["total_questions"],
+                "percentage": round((row["score"] / row["total_questions"]) * 100) if row["total_questions"] else 0,
+            },
+            "summary": {"correct": row["score"], "total": row["total_questions"]},
+        }
+        if row.get("answers_json"):
+            try:
+                report_data["details"]["answers"] = json.loads(row["answers_json"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return render_template("result.html", report=report_data, from_history=True, report_id=report_id)
+
+
+@app.route("/download-ishihara-report")
+def download_ishihara_report():
+    """Download Ishihara test PDF report (uses session or report_id)."""
+    report_id = request.args.get("id", type=int)
+    if report_id:
+        row = get_test_result_by_id(report_id)
+        if row and row.get("report_data"):
+            try:
+                report = json.loads(row["report_data"])
+                if report.get("kind") == "ishihara":
+                    return _generate_pdf_report(report, "ishihara_report.pdf")
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return redirect(url_for("reports"))
+    report = session.get("last_report")
+    if report and report.get("kind") == "ishihara":
+        return _generate_pdf_report(report, "ishihara_report.pdf")
+    return redirect(url_for("index"))
+
+
 @app.route("/download-report")
 def download_report():
+    """Download PDF report (session or by id)."""
+    report_id = request.args.get("id", type=int)
+    if report_id:
+        row = get_test_result_by_id(report_id)
+        if row and row.get("report_data"):
+            try:
+                report = json.loads(row["report_data"])
+                return _generate_pdf_report(report, "color_vision_report.pdf")
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return redirect(url_for("reports"))
     report = session.get("last_report")
     if not report:
         return redirect(url_for("index"))
+    return _generate_pdf_report(report, "color_vision_report.pdf")
+
+
+def _generate_pdf_report(report: dict, filename: str):
 
     # Lazy import to avoid dependency issues if PDF is not installed yet.
     try:
@@ -323,15 +498,30 @@ def download_report():
             pdf.ln(1)
     elif kind == "ishihara":
         details = report.get("details", {})
-        pdf.cell(
-            0,
-            8,
-            f"Normal score: {details.get('normal_score', 0)} / {details.get('total_questions', 0)}",
-            ln=True,
-        )
+        total_q = details.get("total_questions", 0)
+        correct = details.get("normal_score", details.get("correct_count", 0))
+        pdf.cell(0, 8, f"Total Questions: {total_q}", ln=True)
+        pdf.cell(0, 8, f"Correct Answers: {correct}", ln=True)
+        pdf.cell(0, 8, f"Score: {correct}/{total_q}", ln=True)
         pdf.cell(0, 8, f"Protan matches: {details.get('protan_score', 0)}", ln=True)
         pdf.cell(0, 8, f"Deutan matches: {details.get('deutan_score', 0)}", ln=True)
         pdf.cell(0, 8, f"Accuracy: {details.get('percentage', 0)}%", ln=True)
+
+        answers = details.get("answers", [])
+        if answers:
+            pdf.ln(4)
+            pdf.set_font("Arial", "B", 11)
+            pdf.cell(0, 8, "Table of Answers", ln=True)
+            pdf.set_font("Arial", "", 10)
+            pdf.cell(40, 8, "Question", border=1)
+            pdf.cell(50, 8, "User Answer", border=1)
+            pdf.cell(50, 8, "Correct Answer", border=1)
+            pdf.ln()
+            for a in answers:
+                pdf.cell(40, 6, str(a.get("question", "")), border=1)
+                pdf.cell(50, 6, str(a.get("userAnswer", "")), border=1)
+                pdf.cell(50, 6, str(a.get("correctAnswer", "")), border=1)
+                pdf.ln()
 
     buffer = io.BytesIO()
     pdf.output(buffer)
@@ -341,7 +531,7 @@ def download_report():
         buffer,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name="color_vision_report.pdf",
+        download_name=filename,
     )
 
 

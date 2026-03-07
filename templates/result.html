@@ -39,10 +39,29 @@
 
         {% if report.kind == 'ishihara' %}
         {% set d = report.details %}
-        <p><strong>Normal score:</strong> {{ d.normal_score }} / {{ d.total_questions }}</p>
-        <p><strong>Protan matches:</strong> {{ d.protan_score }}</p>
-        <p><strong>Deutan matches:</strong> {{ d.deutan_score }}</p>
-        <p><strong>Accuracy:</strong> {{ d.percentage }}%</p>
+        {% set s = report.summary or {} %}
+        <p><strong>Score:</strong> {{ d.normal_score or s.correct or 0 }} / {{ d.total_questions or s.total or 0 }}</p>
+        <p><strong>Correct Answers:</strong> {{ d.normal_score or s.correct or 0 }}</p>
+        <p><strong>Protan matches:</strong> {{ d.protan_score or 0 }}</p>
+        <p><strong>Deutan matches:</strong> {{ d.deutan_score or 0 }}</p>
+        <p><strong>Accuracy:</strong> {{ d.percentage or 0 }}%</p>
+        {% if d.answers %}
+        <h3>Answer Breakdown</h3>
+        <table style="margin:20px auto; border-collapse:collapse; text-align:left;">
+            <thead>
+                <tr><th style="border:1px solid #ccc; padding:8px;">Question</th><th style="border:1px solid #ccc; padding:8px;">User Answer</th><th style="border:1px solid #ccc; padding:8px;">Correct Answer</th></tr>
+            </thead>
+            <tbody>
+                {% for a in d.answers %}
+                <tr><td style="border:1px solid #ccc; padding:8px;">{{ a.question }}</td><td style="border:1px solid #ccc; padding:8px;">{{ a.userAnswer }}</td><td style="border:1px solid #ccc; padding:8px;">{{ a.correctAnswer }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        <br>
+        <button onclick="window.location.href='{{ url_for('download_ishihara_report') }}{% if from_history and report_id %}?id={{ report_id }}{% endif %}'">
+            Download Ishihara PDF Report
+        </button>
         {% elif report.kind == 'mosaic' %}
         {% set s = report.summary %}
         <p><strong>Total correct:</strong> {{ s.correct }} / {{ s.total }}</p>
@@ -59,12 +78,11 @@
             </li>
             {% endfor %}
         </ul>
-        {% endif %}
-
         <br>
-        <button onclick="window.location.href='{{ url_for('download_report') }}'">
-            Download PDF Report
+        <button onclick="window.location.href='{{ url_for('download_report') }}{% if from_history and report_id %}?id={{ report_id }}{% endif %}'">
+            Download Mosaic PDF Report
         </button>
+        {% endif %}
         <br><br>
         <button onclick="goHome()">Go to Home</button>
 

@@ -16,6 +16,7 @@ let currentQuestion = 0;
 let normalScore = 0;
 let protanScore = 0;
 let deutanScore = 0;
+let userAnswers = [];  // Store { question, userAnswer, correctAnswer } for each
 
 function nextQuestion() {
   const answerInput = document.getElementById("answerInput");
@@ -28,9 +29,16 @@ function nextQuestion() {
     return;
   }
 
-  if (userAnswer === questions[currentQuestion].normal) normalScore++;
-  if (userAnswer === questions[currentQuestion].protan) protanScore++;
-  if (userAnswer === questions[currentQuestion].deutan) deutanScore++;
+  const q = questions[currentQuestion];
+  if (userAnswer === q.normal) normalScore++;
+  if (userAnswer === q.protan) protanScore++;
+  if (userAnswer === q.deutan) deutanScore++;
+
+  userAnswers.push({
+    question: currentQuestion + 1,
+    userAnswer: userAnswer,
+    correctAnswer: q.normal
+  });
 
   currentQuestion++;
 
@@ -73,6 +81,11 @@ function finishTest() {
     protanField.value = protanScore.toString();
     deutanField.value = deutanScore.toString();
     totalField.value = total.toString();
+
+    const answersField = document.getElementById("answersJsonField");
+    if (answersField) {
+      answersField.value = JSON.stringify(userAnswers);
+    }
 
     form.submit();
     return;
