@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Color Vision Test</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+  <nav class="main-nav">
+    <div class="logo">Color Vision Detector</div>
+
+    <div class="nav-links">
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('test') }}">Test</a>
+      <a href="{{ url_for('reports') }}">Reports</a>
+      <a href="{{ url_for('simulation') }}">Simulation</a>
+      <a href="{{ url_for('about') }}">About CVD</a>
+      <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <h1>Color Vision Deficiency Detection</h1>
+    <p>Take a quick Ishihara or Mosaic test and analyze your vision.</p>
+    <button onclick="window.location.href='{{ url_for('test') }}'">
+      Start Ishihara Test
+    </button>
+    <br><br>
+    <button onclick="window.location.href='{{ url_for('mosaic') }}'">
+      Mosaic Color Blindness Test
+    </button>
+  </section>
+
+  <div class="bubbles">
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+  </div>
+
+  <footer class="footer">
+    © 2026 Color Vision Detector | Academic Project
+  </footer>
+
+  <script>
+    function toggleBW() {
+      document.body.classList.toggle("bw-mode");
+
+      if (document.body.classList.contains("bw-mode")) {
+        localStorage.setItem("mode", "bw");
+      } else {
+        localStorage.setItem("mode", "color");
+      }
+    }
+
+    if (localStorage.getItem("mode") === "bw") {
+      document.body.classList.add("bw-mode");
+    }
+  </script>
+</body>
+
+</html>
+
