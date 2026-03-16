@@ -88,7 +88,6 @@
                 {% for q in questions %}
                 <div class="mosaic-card">
                     <h3>{{ q.label }}</h3>
-                    <p style="font-size:14px; opacity:0.85;">{{ q.description }}</p>
 
                     <!-- JS will fill this 6x6 grid and paint the digit using two color groups -->
                     <div class="mosaic-tile" data-question-id="{{ q.id }}" data-type="{{ q.type }}"></div>
