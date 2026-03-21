@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Sign Up - Color Vision Detector</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .signup-hero {
+            margin: 80px auto;
+            width: 70%;
+            padding: 40px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            text-align: left;
+            margin-top: 30px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .form-group input, .form-group select {
+            padding: 12px;
+            border-radius: 15px;
+            border: none;
+            outline: none;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 15px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 0;
+            text-align: left;
+        }
+
+        .error-message {
+            color: #ff512f;
+            margin-bottom: 15px;
+        }
+
+        .links {
+            margin-top: 25px;
+        }
+
+        .links a {
+            color: #4facfe;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="main-nav">
+        <div class="logo">Color Vision Detector</div>
+
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}">Home</a>
+            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+        </div>
+    </nav>
+
+    <section class="hero signup-hero">
+        <h1 style="font-size: 40px;">Create Account</h1>
+        <p>Join to save your testing analytics.</p>
+
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('signup') }}">
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label>Full Name *</label>
+                    <input type="text" name="name" required placeholder="John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" name="email" required placeholder="john@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input type="password" name="password" required placeholder="Secure password">
+                </div>
+
+                <div class="form-group">
+                    <label>Age</label>
+                    <input type="number" name="age" min="1" max="120" placeholder="E.g. 25">
+                </div>
+
+                <div class="form-group">
+                    <label>Gender</label>
+                    <select name="gender">
+                        <option value="">Select...</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" name="country" placeholder="E.g. USA">
+                </div>
+
+                <div class="form-group">
+                    <label>Occupation</label>
+                    <input type="text" name="occupation" placeholder="E.g. Student">
+                </div>
+
+                <div class="form-group">
+                    <label>Do you wear glasses?</label>
+                    <select name="glasses">
+                        <option value="">Select...</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Known vision issues?</label>
+                    <select name="vision_issues">
+                        <option value="">Select...</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label>Phone Number (Optional)</label>
+                    <input type="tel" name="phone" placeholder="+1 234 567 8900">
+                </div>
+            </div>
+
+            <button type="submit" style="margin-top: 30px;">Sign Up</button>
+        </form>
+
+        <div class="links">
+            <a href="{{ url_for('login') }}">Already have an account? Login here</a>
+        </div>
+    </section>
+
+    <div class="bubbles">
+        <span></span><span></span><span></span>
+        <span></span><span></span><span></span>
+    </div>
+
+    <script>
+        function toggleBW() {
+            document.body.classList.toggle("bw-mode");
+            localStorage.setItem("mode", document.body.classList.contains("bw-mode") ? "bw" : "color");
+        }
+        if (localStorage.getItem("mode") === "bw") {
+            document.body.classList.add("bw-mode");
+        }
+    </script>
+</body>
+
+</html>

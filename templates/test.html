@@ -19,9 +19,13 @@
       <a href="{{ url_for('about') }}">About</a>
       <a href="{{ url_for('mosaic') }}">Mosaic Test</a>
       <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
-      <a href="{{ url_for('index') }}">Logout</a>
-    </div>
-  </nav>
+            {% if session.get('user_id') %}
+            <a href="{{ url_for('logout') }}">Logout</a>
+            {% else %}
+            <a href="{{ url_for('login') }}">Login / Sign Up</a>
+            {% endif %}
+        </div>
+    </nav>
 
   <section class="hero">
     <h1>Ishihara Test</h1>
