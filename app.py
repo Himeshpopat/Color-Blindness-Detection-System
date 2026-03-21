@@ -4,6 +4,8 @@ import json
 import sqlite3
 import os
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from flask import (
     Flask,
     render_template,
@@ -38,6 +40,28 @@ def init_db():
             report_data TEXT
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            age INTEGER,
+            gender TEXT,
+            country TEXT,
+            occupation TEXT,
+            glasses TEXT,
+            vision_issues TEXT,
+            phone TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Safely add user_id column to test_results if it doesn't exist
+    c.execute("PRAGMA table_info(test_results)")
+    columns = [col[1] for col in c.fetchall()]
+    if "user_id" not in columns:
+        c.execute("ALTER TABLE test_results ADD COLUMN user_id INTEGER")
+        
     conn.commit()
     conn.close()
 
@@ -50,9 +74,11 @@ def save_test_result(test_type: str, score: int, total: int, diagnosis: str,
     c = conn.cursor()
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     report_str = json.dumps(report_data) if report_data else None
+    user_id = session.get("user_id")
+    
     c.execute(
-        "INSERT INTO test_results (test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (test_type, score, total, diagnosis, ts, answers_json, report_str),
+        "INSERT INTO test_results (test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (test_type, score, total, diagnosis, ts, answers_json, report_str, user_id),
     )
     row_id = c.lastrowid
     conn.commit()
@@ -60,15 +86,21 @@ def save_test_result(test_type: str, score: int, total: int, diagnosis: str,
     return row_id
 
 
-def get_all_test_results():
+def get_all_test_results(user_id=None):
     """Fetch all test results from the database."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute(
-        "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data FROM test_results ORDER BY id DESC"
-    )
+    if user_id:
+        c.execute(
+            "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data FROM test_results WHERE user_id = ? ORDER BY id DESC",
+            (user_id,)
+        )
+    else:
+        c.execute(
+            "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data FROM test_results ORDER BY id DESC"
+        )
     rows = c.fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -183,10 +215,97 @@ def store_report(report: dict) -> None:
 def index():
     return render_template("index.html")
 
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        age = request.form.get("age")
+        gender = request.form.get("gender")
+        country = request.form.get("country")
+        occupation = request.form.get("occupation")
+        glasses = request.form.get("glasses")
+        vision_issues = request.form.get("vision_issues")
+        phone = request.form.get("phone")
+
+        if not name or not email or not password:
+            return render_template("signup.html", error="Name, Email and Password are required.")
+
+        hashed_password = generate_password_hash(password)
+
+        init_db()
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        try:
+            c.execute("""
+                INSERT INTO users (name, email, password, age, gender, country, occupation, glasses, vision_issues, phone)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (name, email, hashed_password, age, gender, country, occupation, glasses, vision_issues, phone))
+            conn.commit()
+            return redirect(url_for("login"))
+        except sqlite3.IntegrityError:
+            return render_template("signup.html", error="Email already exists.")
+        finally:
+            conn.close()
+
+    return render_template("signup.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+
+        init_db()
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email = ?", (email,))
+        user_row = c.fetchone()
+        conn.close()
+
+        if user_row and check_password_hash(user_row["password"], password):
+            session["user_id"] = user_row["id"]
+            session["user_name"] = user_row["name"]
+            return redirect(url_for("dashboard"))
+        else:
+            return render_template("login.html", error="Invalid email or password.")
+            
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.pop("user_id", None)
+    session.pop("user_name", None)
+    return redirect(url_for("index"))
 
 @app.route("/dashboard")
 def dashboard():
-    return render_template("dashboard.html")
+    user_id = session.get("user_id")
+    user_history = []
+    
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute(
+            "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data FROM test_results WHERE user_id = ? ORDER BY id DESC LIMIT 5",
+            (user_id,)
+        )
+        user_history = [dict(row) for row in c.fetchall()]
+    else:
+        # If not logged in, show general test results (latest 5)
+        c.execute(
+            "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data FROM test_results ORDER BY id DESC LIMIT 5"
+        )
+        user_history = [dict(row) for row in c.fetchall()]
+        
+    conn.close()
+    
+    return render_template("dashboard.html", user_history=user_history)
 
 
 @app.route("/test")
@@ -202,7 +321,8 @@ def about():
 
 @app.route("/reports")
 def reports():
-    tests = get_all_test_results()
+    user_id = session.get("user_id")
+    tests = get_all_test_results(user_id)
     ishihara_count = sum(1 for t in tests if t.get("test_type") == "ishihara")
     mosaic_count = sum(1 for t in tests if t.get("test_type") == "mosaic")
     return render_template(
