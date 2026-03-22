@@ -128,42 +128,42 @@ ISHIHARA_TOTAL_QUESTIONS = 10
 
 # ---- Mosaic test configuration ----
 
-# Each mosaic plate visually encodes a single digit (0–9) using
+# Each mosaic plate visually encodes a single digit (0-9) using
 # a 6x6 grid and two color groups (foreground vs background).
 
 MOSAIC_QUESTIONS = [
     {
         "id": 1,
         "label": "Mosaic Plate 1",
-        "description": "Red–green mosaic forming the digit 3.",
+        "description": "Red-green mosaic forming the digit 3.",
         "correct_answer": "3",
-        "type": "rg",  # red‑green oriented
+        "type": "rg",  # red-green oriented
     },
     {
         "id": 2,
         "label": "Mosaic Plate 2",
-        "description": "Red–green mosaic forming the digit 5.",
+        "description": "Red-green mosaic forming the digit 5.",
         "correct_answer": "5",
         "type": "rg",
     },
     {
         "id": 3,
         "label": "Mosaic Plate 3",
-        "description": "Blue–yellow mosaic forming the digit 8.",
+        "description": "Blue-yellow mosaic forming the digit 8.",
         "correct_answer": "8",
-        "type": "by",  # blue‑yellow oriented
+        "type": "by",  # blue-yellow oriented
     },
     {
         "id": 4,
         "label": "Mosaic Plate 4",
-        "description": "Red–green mosaic forming the digit 2.",
+        "description": "Red-green mosaic forming the digit 2.",
         "correct_answer": "2",
         "type": "rg",
     },
     {
         "id": 5,
         "label": "Mosaic Plate 5",
-        "description": "Blue–yellow mosaic forming the digit 9.",
+        "description": "Blue-yellow mosaic forming the digit 9.",
         "correct_answer": "9",
         "type": "by",
     },
@@ -310,7 +310,7 @@ def dashboard():
 
 @app.route("/test")
 def test():
-    # Ishihara test page (front‑end handled progression, backend handles diagnosis)
+    # Ishihara test page (front-end handled progression, backend handles diagnosis)
     return render_template("test.html", total_questions=ISHIHARA_TOTAL_QUESTIONS)
 
 
@@ -548,105 +548,195 @@ def download_report():
 
 
 def _generate_pdf_report(report: dict, filename: str):
+    """Generate a PDF report using reportlab (replaces broken fpdf dependency)."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    )
 
-    # Lazy import to avoid dependency issues if PDF is not installed yet.
-    try:
-        from fpdf import FPDF
-    except Exception:
-        # If fpdf is not installed, show a simple text file instead.
-        buffer = io.BytesIO()
-        content_lines = [
-            "Color Blindness Detection System Report",
-            "",
-            f"Test: {report.get('test_name', 'Unknown')}",
-            f"Diagnosis: {report.get('diagnosis', '-')}",
-            f"Timestamp: {report.get('timestamp', '-')}",
-        ]
-        buffer.write("\n".join(content_lines).encode("utf-8"))
-        buffer.seek(0)
-        return send_file(
-            buffer,
-            mimetype="text/plain",
-            as_attachment=True,
-            download_name="color_vision_report.txt",
-        )
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=inch * 0.75,
+        leftMargin=inch * 0.75,
+        topMargin=inch * 0.75,
+        bottomMargin=inch * 0.75,
+    )
 
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "ReportTitle",
+        parent=styles["Title"],
+        fontSize=18,
+        spaceAfter=6,
+        textColor=colors.HexColor("#1a1a2e"),
+    )
+    heading_style = ParagraphStyle(
+        "SectionHeading",
+        parent=styles["Heading2"],
+        fontSize=13,
+        spaceBefore=12,
+        spaceAfter=4,
+        textColor=colors.HexColor("#16213e"),
+    )
 
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Color Blindness Detection System", ln=True)
+    story = []
 
-    pdf.set_font("Arial", "", 12)
-    pdf.ln(5)
-    pdf.cell(0, 8, f"Test: {report.get('test_name', 'Unknown')}", ln=True)
-    pdf.cell(0, 8, f"Diagnosis: {report.get('diagnosis', '-')}", ln=True)
-    pdf.cell(0, 8, f"Timestamp: {report.get('timestamp', '-')}", ln=True)
+    # Title block
+    story.append(Paragraph("Color Blindness Detection System", title_style))
+    story.append(Paragraph(f"Test: {report.get('test_name', 'Unknown')}", styles["Heading2"]))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#cccccc")))
+    story.append(Spacer(1, 8))
 
-    pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 8, "Details:", ln=True)
+    # Summary info table
+    diagnosis = report.get("diagnosis", "-")
+    timestamp = report.get("timestamp", "-")
+    kind = report.get("kind", "")
 
-    pdf.set_font("Arial", "", 11)
-    kind = report.get("kind")
+    summary_data = [
+        ["Diagnosis", diagnosis],
+        ["Date / Time", timestamp],
+    ]
+    summary_table = Table(summary_data, colWidths=[1.8 * inch, 5 * inch])
+    summary_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#e8eaf6")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 11),
+        ("ROWBACKGROUNDS", (1, 0), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 14))
+
+    # Kind-specific sections
     if kind == "mosaic":
         summary = report.get("summary", {})
-        pdf.cell(0, 8, f"Score: {summary.get('correct', 0)} / {summary.get('total', 0)}", ln=True)
-        pdf.cell(
-            0,
-            8,
-            f"Red-Green correct: {summary.get('rg_correct', 0)} / {summary.get('rg_total', 0)}",
-            ln=True,
-        )
-        pdf.cell(
-            0,
-            8,
-            f"Blue-Yellow correct: {summary.get('by_correct', 0)} / {summary.get('by_total', 0)}",
-            ln=True,
-        )
+        story.append(Paragraph("Score Summary", heading_style))
+        score_data = [
+            ["Metric", "Result"],
+            ["Total Correct", f"{summary.get('correct', 0)} / {summary.get('total', 0)}"],
+            ["Red-Green Correct", f"{summary.get('rg_correct', 0)} / {summary.get('rg_total', 0)}"],
+            ["Blue-Yellow Correct", f"{summary.get('by_correct', 0)} / {summary.get('by_total', 0)}"],
+        ]
+        score_table = Table(score_data, colWidths=[2.5 * inch, 4.3 * inch])
+        score_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3949ab")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 11),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(score_table)
+        story.append(Spacer(1, 14))
 
-        pdf.ln(4)
+        # Per-question breakdown
+        story.append(Paragraph("Question Breakdown", heading_style))
+        q_data = [["Q#", "Label", "Expected", "Your Answer", "Result"]]
         for item in report.get("details", []):
-            pdf.multi_cell(
-                0,
-                6,
-                f"Q{item['id']} - {item['label']}: expected {item['correct_answer']}, "
-                f"you answered {item['user_answer']} "
-                f"({'correct' if item['is_correct'] else 'incorrect'})",
-            )
-            pdf.ln(1)
+            q_data.append([
+                str(item.get("id", "")),
+                item.get("label", ""),
+                item.get("correct_answer", ""),
+                item.get("user_answer", ""),
+                "Correct" if item.get("is_correct") else "Incorrect",
+            ])
+        col_w = [0.4 * inch, 1.8 * inch, 1.1 * inch, 1.4 * inch, 1.1 * inch]
+        q_table = Table(q_data, colWidths=col_w)
+        result_colors = []
+        for i, row in enumerate(q_data[1:]):
+            color = colors.HexColor("#2e7d32") if row[4] == "Correct" else colors.HexColor("#c62828")
+            result_colors.append(("TEXTCOLOR", (4, i + 1), (4, i + 1), color))
+        q_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3949ab")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ] + result_colors))
+        story.append(q_table)
+
     elif kind == "ishihara":
         details = report.get("details", {})
         total_q = details.get("total_questions", 0)
         correct = details.get("normal_score", details.get("correct_count", 0))
-        pdf.cell(0, 8, f"Total Questions: {total_q}", ln=True)
-        pdf.cell(0, 8, f"Correct Answers: {correct}", ln=True)
-        pdf.cell(0, 8, f"Score: {correct}/{total_q}", ln=True)
-        pdf.cell(0, 8, f"Protan matches: {details.get('protan_score', 0)}", ln=True)
-        pdf.cell(0, 8, f"Deutan matches: {details.get('deutan_score', 0)}", ln=True)
-        pdf.cell(0, 8, f"Accuracy: {details.get('percentage', 0)}%", ln=True)
+        percentage = details.get("percentage", 0)
+
+        story.append(Paragraph("Score Summary", heading_style))
+        score_data = [
+            ["Metric", "Result"],
+            ["Total Questions", str(total_q)],
+            ["Correct Answers", str(correct)],
+            ["Score", f"{correct} / {total_q}"],
+            ["Accuracy", f"{percentage}%"],
+            ["Protan Matches", str(details.get("protan_score", 0))],
+            ["Deutan Matches", str(details.get("deutan_score", 0))],
+        ]
+        score_table = Table(score_data, colWidths=[2.5 * inch, 4.3 * inch])
+        score_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3949ab")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 11),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(score_table)
+        story.append(Spacer(1, 14))
 
         answers = details.get("answers", [])
         if answers:
-            pdf.ln(4)
-            pdf.set_font("Arial", "B", 11)
-            pdf.cell(0, 8, "Table of Answers", ln=True)
-            pdf.set_font("Arial", "", 10)
-            pdf.cell(40, 8, "Question", border=1)
-            pdf.cell(50, 8, "User Answer", border=1)
-            pdf.cell(50, 8, "Correct Answer", border=1)
-            pdf.ln()
+            story.append(Paragraph("Answer Table", heading_style))
+            a_data = [["Question", "Your Answer", "Correct Answer", "Result"]]
             for a in answers:
-                pdf.cell(40, 6, str(a.get("question", "")), border=1)
-                pdf.cell(50, 6, str(a.get("userAnswer", "")), border=1)
-                pdf.cell(50, 6, str(a.get("correctAnswer", "")), border=1)
-                pdf.ln()
+                user_ans = str(a.get("userAnswer", ""))
+                correct_ans = str(a.get("correctAnswer", ""))
+                is_right = user_ans.strip() == correct_ans.strip()
+                a_data.append([
+                    str(a.get("question", "")),
+                    user_ans,
+                    correct_ans,
+                    "Correct" if is_right else "Incorrect",
+                ])
+            col_w = [1.5 * inch, 1.8 * inch, 1.8 * inch, 1.7 * inch]
+            a_table = Table(a_data, colWidths=col_w)
+            result_colors = []
+            for i, row in enumerate(a_data[1:]):
+                color = colors.HexColor("#2e7d32") if row[3] == "Correct" else colors.HexColor("#c62828")
+                result_colors.append(("TEXTCOLOR", (3, i + 1), (3, i + 1), color))
+            a_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3949ab")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ] + result_colors))
+            story.append(a_table)
 
-    buffer = io.BytesIO()
-    pdf.output(buffer)
+    # Build PDF and return
+    doc.build(story)
     buffer.seek(0)
-
     return send_file(
         buffer,
         mimetype="application/pdf",
@@ -657,4 +747,3 @@ def _generate_pdf_report(report: dict, filename: str):
 
 if __name__ == "__main__":
     app.run(debug=True)
-

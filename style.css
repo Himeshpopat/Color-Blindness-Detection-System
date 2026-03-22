@@ -6,10 +6,9 @@ body {
   color: white;
   text-align: center;
   overflow-x: hidden;
-  /* FIXED */
-  background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1c1c3c);
-  background-size: 400% 400%;
-  animation: gradientMove 12s ease infinite;
+  position: relative;
+  min-height: 100vh;
+  background: #0f2027; /* fallback only */
 }
 
 html {
@@ -437,4 +436,20 @@ body.bw-mode .main-nav {
 /* Links */
 body.bw-mode a {
   color: #fff !important;
+} 
+
+/* ===== FIXED BACKGROUND LAYER ===== */
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1c1c3c);
+  background-size: 400% 400%;
+  animation: gradientMove 12s ease infinite;
+}
+
+body::before {
+  z-index: -1;
 }
