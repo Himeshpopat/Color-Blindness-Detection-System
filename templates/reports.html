@@ -80,7 +80,7 @@
         .chart-container {
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(20px);
-            padding: 25px;
+            padding: 50px;
             border-radius: 20px;
             position: relative;
             height: 300px;
@@ -97,11 +97,24 @@
             opacity: 0.8;
         }
 
+        /* Badge for test type in table */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .badge-ishihara { background: rgba(255,152,0,0.2); color: #ffb74d; }
+        .badge-d15      { background: rgba(33,150,243,0.2); color: #64b5f6; }
+        .badge-mosaic   { background: rgba(156,39,176,0.2); color: #ce93d8; }
+
         @media (max-width: 768px) {
             .stats-grid {
                 grid-template-columns: 1fr 1fr;
             }
-
             .charts-row {
                 grid-template-columns: 1fr;
             }
@@ -115,12 +128,15 @@
         <div class="logo">Color Vision Detector</div>
         <div class="nav-links">
             <a href="{{ url_for('dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('test') }}">Test</a>
-            <a href="{{ url_for('mosaic') }}">D-15 Test</a>
+            <a href="{{ url_for('test') }}">Ishihara</a>
+            <a href="{{ url_for('d15') }}">D-15</a>
+            <a href="{{ url_for('mosaic') }}">Mosaic</a>
+            {% if session.get('user_id') %}
             <a href="{{ url_for('reports') }}">Reports</a>
+            {% endif %}
             <a href="{{ url_for('simulation') }}">Simulation</a>
-            <a href="{{ url_for('about') }}">About</a>
-            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="{{ url_for('about') }}">About CVD</a>
+            <button onclick="toggleBW()" class="mode-btn">Dark Mode</button>
             {% if session.get('user_id') %}
             <a href="{{ url_for('logout') }}">Logout</a>
             {% else %}
@@ -132,25 +148,33 @@
     <section class="hero">
         <h1>Reports & Analytics</h1>
 
+        <!-- Summary stats: 4 cards (Total, Ishihara, D-15, Mosaic) -->
         <div class="stats-grid">
             <div class="stat-card">
-                <h2 id="totalTests">{{ total_count }}</h2>
+                <h2>{{ total_count }}</h2>
                 <p>Total Tests Taken</p>
             </div>
             <div class="stat-card">
-                <h2 id="ishiharaCount">{{ ishihara_count }}</h2>
+                <h2>{{ ishihara_count }}</h2>
                 <p>Ishihara Tests</p>
             </div>
             <div class="stat-card">
-                <h2 id="mosaicCount">{{ mosaic_count }}</h2>
+                <h2>{{ d15_count }}</h2>
                 <p>D-15 Tests</p>
             </div>
             <div class="stat-card">
-                <h2 id="lastResult">{% if tests %}{{ tests[0].diagnosis }}{% else %}-{% endif %}</h2>
-                <p>Last Result</p>
+                <h2>{{ mosaic_count }}</h2>
+                <p>Mosaic Tests</p>
             </div>
         </div>
 
+        <!-- Last result banner -->
+        <div style="text-align:center; margin-bottom:10px; opacity:0.85; text-shadow: 0 0 5px rgba(255,255,255,0.3); font-size:25px;">
+            <strong>Latest Result:</strong>
+            {% if tests %}{{ tests[0].diagnosis }}{% else %}—{% endif %}
+        </div>
+
+        <!-- Test history table -->
         <div class="reports-table-container">
             <h3>Test History</h3>
             {% if tests %}
@@ -167,8 +191,10 @@
                 <tbody>
                     {% for t in tests %}
                     <tr class="clickable" onclick="window.location.href='{{ url_for('report_detail', report_id=t.id) }}'">
-                        <td>{{ t.id }}</td>
-                        <td>{{ t.test_type|capitalize }}</td>
+                        <td>{{ loop.revindex }}</td>
+                        <td>
+                            <span class="badge badge-{{ t.test_type }}">{{ t.test_type|capitalize }}</span>
+                        </td>
                         <td>{{ t.score }}/{{ t.total_questions }}</td>
                         <td>{{ t.diagnosis }}</td>
                         <td>{{ t.timestamp }}</td>
@@ -178,13 +204,15 @@
             </table>
             {% else %}
             <div class="empty-state">
-                <p>No reports yet. Complete an Ishihara or D-15 test to see your results here.</p>
-                <a href="{{ url_for('test') }}" style="margin-right:10px;">Take Ishihara Test</a>
-                <a href="{{ url_for('mosaic') }}">Take D-15 Test</a>
+                <p>No reports yet. Complete an Ishihara, D-15, or Mosaic test to see your results here.</p>
+                {#<a href="{{ url_for('test') }}" style="margin-right:10px;">Take Ishihara Test</a>
+                <a href="{{ url_for('d15') }}" style="margin-right:10px;">Take D-15 Test</a>
+                <a href="{{ url_for('mosaic') }}">Take Mosaic Test</a>#}
             </div>
             {% endif %}
         </div>
 
+        <!-- Charts -->
         <div class="charts-row">
             <div class="chart-container">
                 <h3>Diagnosis Distribution</h3>
@@ -219,7 +247,7 @@
                     diagnosisCounts["Normal"]++;
                 } else if (d.includes("red-green") || d.includes("protan") || d.includes("deutan") || d.includes("green")) {
                     diagnosisCounts["Red-Green"]++;
-                } else if (d.includes("blue-yellow") || d.includes("yellow")) {
+                } else if (d.includes("blue-yellow") || d.includes("yellow") || d.includes("tritan")) {
                     diagnosisCounts["Blue-Yellow"]++;
                 } else {
                     diagnosisCounts["Other"]++;
@@ -300,7 +328,7 @@
                         },
                         y: {
                             beginAtZero: true,
-                            ticks: { color: "white" },
+                            ticks: { color: "white", stepSize: 1 },
                             grid: { color: "rgba(255,255,255,0.1)" }
                         }
                     }

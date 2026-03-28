@@ -97,6 +97,52 @@ nav {
 
 /* ================= GLASS CARD ================= */
 
+/* Find this in style.css and change smooth to auto */
+html {
+  scroll-behavior: auto !important;
+}
+
+/* Update your fadeIn animation to be more stable */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px); /* Reduced from 60px to prevent "jumping" */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Specific fix for Ishihara jumping */
+.ishihara-page {
+    opacity: 0;
+    /* Use a smaller movement (20px) to prevent triggering browser scroll-anchoring */
+    animation: ishiharaRise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+}
+
+@keyframes ishiharaRise {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Force the HTML to stay still */
+html {
+    scroll-behavior: auto !important;
+    overflow-anchor: none !important; /* This stops the browser from "anchoring" to the input */
+}
+
+/* Ensure the hover effect from your original CSS still works */
+.ishihara-page:hover {
+    transform: translateY(-8px) scale(1.02) !important;
+}
+
 .hero {
   margin: 140px auto;
   width: 60%;
@@ -368,41 +414,125 @@ body {
   font-size: 12px;
 }
 
+/* --- REPLACE THIS SECTION IN style.css --- */
+
+/* 1. Remove the filter from the body so it doesn't force images to gray */
 body.bw-mode {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* 2. Apply grayscale only to UI elements, NOT the test content */
+body.bw-mode nav, 
+body.bw-mode .hero h1, 
+body.bw-mode .hero p, 
+body.bw-mode .bubbles,
+body.bw-mode .footer,
+body.bw-mode .progress-container,
+body.bw-mode .mode-btn {
   filter: grayscale(100%);
 }
 
-body.bw-mode {
-  background: #000 !important;
-  color: #fff !important;
+/* 3. This is the "Shield" that keeps your images colorful */
+body.bw-mode #plateImage,
+body.bw-mode .test-content img,
+body.bw-mode .disc,
+body.bw-mode .anchor-disc {
+  filter: none !important;
+  -webkit-filter: none !important;
+  background-image: unset !important; /* Prevents the 'background-image: none' rule from hiding them */
 }
 
-body.bw-mode * {
-  background-image: none !important;
-  box-shadow: none !important;
-}
-
-body.bw-mode .card,
-body.bw-mode .about-card,
-body.bw-mode .report-card,
-body.bw-mode .stat-card,
+/* 4. Fix the hero box transparency for B/W mode */
 body.bw-mode .hero {
   background: #111 !important;
   border: 1px solid #444;
+  backdrop-filter: none !important;
 }
 
+/* 5. Turn buttons dark and remove colorful gradients */
 body.bw-mode button {
   background: #222 !important;
   color: #fff !important;
-  border: 1px solid #555;
+  border: 1px solid #444 !important;
+  background-image: none !important; /* Removes the orange/pink gradient */
+  box-shadow: none !important;
+  position: relative;
+  overflow: hidden; /* This "clips" the flash so it stays inside the button */
+  transition: all 0.3s ease;
 }
 
-body.bw-mode .main-nav {
-  background: #000 !important;
-  border-bottom: 1px solid #444;
+/* 6. The "Flash" Layer (The white shine) */
+body.bw-mode button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -150%; /* Start the shine off-screen to the left */
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(255, 255, 255, 0.4), /* The white flash color */
+    transparent
+  );
+  transition: all 0.6s ease;
 }
 
-body.bw-mode a {
-  color: #fff !important;
+/* 7. Hover Effects: Darken background and trigger the flash */
+body.bw-mode button:hover {
+  background: #333 !important;
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.1) !important;
 }
 
+body.bw-mode button:hover::before {
+  left: 150%; /* Move the shine all the way to the right */
+}
+
+/* --- DASHBOARD CARDS B/W MODE FLASH --- */
+
+/* 1. Reset cards: Dark background, remove colorful animated borders */
+body.bw-mode .card {
+    background: #111 !important;
+    border: 1px solid #444 !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    position: relative;
+    overflow: hidden; /* Clips the flash inside the card */
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* 2. Hide the colorful glowing border pseudo-element in B/W mode */
+body.bw-mode .card::before {
+    display: none !important;
+}
+
+/* 3. Create the White Flash layer */
+body.bw-mode .card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -150%; /* Start off-screen */
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        120deg,
+        transparent,
+        rgba(255, 255, 255, 0.3), /* The white flash */
+        transparent
+    );
+    transition: all 0.7s ease;
+    z-index: 1; /* Ensure it appears above the dark background */
+}
+
+/* 4. Hover Trigger: Darken and Slide the Flash */
+body.bw-mode .card:hover {
+    background: #1a1a1a !important;
+    transform: translateY(-12px) scale(1.05) !important;
+    box-shadow: 0 20px 40px rgba(255, 255, 255, 0.1) !important;
+}
+
+body.bw-mode .card:hover::after {
+    left: 150%; /* Move flash across the card */
+}

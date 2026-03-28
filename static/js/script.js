@@ -3,7 +3,7 @@
 //
 // Sections:
 //   1. Ishihara test  (test.html)       — driven by PLATE_DATA from Flask
-//   2. Farnsworth D-15 test (mosaic.html) — drag-and-drop arrangement test
+//   2. Farnsworth D-15 test (d15.html) — drag-and-drop arrangement test
 // =============================================================================
 
 
@@ -35,7 +35,18 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  // ── Farnsworth D-15 (mosaic.html) ────────────────────────────────────────
+  // ── Mosaic test (mosaic.html) ─────────────────────────────────────────────
+  if (typeof MOSAIC_DATA !== "undefined" && Array.isArray(MOSAIC_DATA) && MOSAIC_DATA.length > 0) {
+    mosaicLoadPlate(0);
+  /*  const mosaicInput = document.getElementById("mosaicInput");
+    if (mosaicInput) {
+      mosaicInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") mosaicNext();
+      });
+    }*/
+  }
+
+  // ── Farnsworth D-15 (d15.html) ───────────────────────────────────────────
   if (document.getElementById("discTray")) {
     initD15();
   }
@@ -51,6 +62,7 @@ function loadPlate(index) {
 
   const plateImage = document.getElementById("plateImage");
   if (plateImage) {
+    // Dynamically set the image path so it always works
     plateImage.src = "/static/images/" + plate.image;
   }
 
@@ -434,6 +446,148 @@ function drawD15Diagram(canvasId, userOrder) {
     ctx.textAlign    = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(id === 0 ? "R" : String(id), x, y);
+  }
+}
+
+
+// =============================================================================
+// =============================================================================
+// SECTION 3 — MOSAIC TEST (mosaic.html)
+// One plate at a time, Enter/Next to advance, canvas-rendered digits.
+// =============================================================================
+
+// ── Digit pixel maps (6 cols × 8 rows) ──────────────────────────────────────
+const MOSAIC_DIGIT_MAPS = {
+  "0": [0,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
+  "1": [0,0,1,1,0,0, 0,1,1,1,0,0, 1,0,1,1,0,0, 0,0,1,1,0,0, 0,0,1,1,0,0, 0,0,1,1,0,0, 0,0,1,1,0,0, 1,1,1,1,1,1],
+  "2": [0,1,1,1,1,0, 1,1,0,0,1,1, 0,0,0,0,1,1, 0,0,0,1,1,0, 0,0,1,1,0,0, 0,1,1,0,0,0, 1,1,0,0,0,0, 1,1,1,1,1,1],
+  "3": [0,1,1,1,1,0, 1,1,0,0,1,1, 0,0,0,0,1,1, 0,0,1,1,1,0, 0,0,0,0,1,1, 0,0,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
+  "4": [0,0,0,1,1,0, 0,0,1,1,1,0, 0,1,0,1,1,0, 1,0,0,1,1,0, 1,1,1,1,1,1, 0,0,0,1,1,0, 0,0,0,1,1,0, 0,0,0,1,1,0],
+  "5": [1,1,1,1,1,1, 1,1,0,0,0,0, 1,1,0,0,0,0, 1,1,1,1,1,0, 0,0,0,0,1,1, 0,0,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
+  "6": [0,1,1,1,1,0, 1,1,0,0,0,0, 1,1,0,0,0,0, 1,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
+  "7": [1,1,1,1,1,1, 0,0,0,0,1,1, 0,0,0,1,1,0, 0,0,0,1,1,0, 0,0,1,1,0,0, 0,0,1,1,0,0, 0,1,1,0,0,0, 0,1,1,0,0,0],
+  "8": [0,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
+  "9": [0,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,1, 0,0,0,0,1,1, 0,0,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
+};
+
+// ── Colour palettes ──────────────────────────────────────────────────────────
+const MOSAIC_PALETTES = {
+  rg: {
+    fg: ["#e74c3c","#c0392b","#e84393","#ff6b81","#ff4757","#c62828"],
+    bg: ["#27ae60","#2ecc71","#1abc9c","#00b894","#55efc4","#00cec9"],
+  },
+  by: {
+    fg: ["#2980b9","#3498db","#74b9ff","#0984e3","#6c5ce7","#4834d4"],
+    bg: ["#f1c40f","#f39c12","#fdcb6e","#e17055","#ffeaa7","#d4ac0d"],
+  },
+};
+
+// ── Seeded RNG (mulberry32) — same plate looks the same on every load ────────
+function mosaicRNG(seed) {
+  let s = seed >>> 0;
+  return function () {
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ── Draw one mosaic plate onto a canvas ──────────────────────────────────────
+function drawMosaicPlate(canvas, digit, type) {
+  const ctx  = canvas.getContext("2d");
+  const W    = canvas.width;
+  const H    = canvas.height;
+  const COLS = 6, ROWS = 8, PAD = 8, GAP = 3;
+  const tileW = (W - PAD * 2 - GAP * (COLS - 1)) / COLS;
+  const tileH = (H - PAD * 2 - GAP * (ROWS - 1)) / ROWS;
+  const radius = Math.min(tileW, tileH) * 0.28;
+
+  const palette = MOSAIC_PALETTES[type] || MOSAIC_PALETTES.rg;
+  const map     = MOSAIC_DIGIT_MAPS[String(digit)];
+  if (!map) return;
+
+  const rng = mosaicRNG((digit.charCodeAt ? digit.charCodeAt(0) : parseInt(digit)) * 137 + (type === "by" ? 9999 : 0));
+
+  ctx.clearRect(0, 0, W, H);
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const isFg = map[r * COLS + c] === 1;
+      const pool = isFg ? palette.fg : palette.bg;
+      // ~10% noise on background tiles
+      const color = (!isFg && rng() < 0.10)
+        ? palette.fg[Math.floor(rng() * palette.fg.length)]
+        : pool[Math.floor(rng() * pool.length)];
+
+      const x = PAD + c * (tileW + GAP);
+      const y = PAD + r * (tileH + GAP);
+
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(x, y, tileW, tileH, radius);
+      ctx.fill();
+    }
+  }
+}
+
+// ── State ────────────────────────────────────────────────────────────────────
+let mosaicCurrent = 0;
+let mosaicAnswers = [];   // [{id, correct_answer, user_answer, type, label, description}]
+
+// ── Load a mosaic plate by index ─────────────────────────────────────────────
+function mosaicLoadPlate(index) {
+  const q      = MOSAIC_DATA[index];
+  const canvas = document.getElementById("mosaicCanvas");
+  
+  if (canvas) {
+    // Smooth fade transition between plates
+    canvas.style.opacity = 0;
+    setTimeout(() => {
+      drawMosaicPlate(canvas, q.correct_answer, q.type);
+      canvas.style.opacity = 1;
+    }, 150);
+  }
+
+  const qc = document.getElementById("questionCount");
+  if (qc) qc.innerText = "Question " + (index + 1) + " of " + MOSAIC_DATA.length;
+
+  const pb = document.getElementById("progressBar");
+  if (pb) pb.style.width = (index / MOSAIC_DATA.length * 100) + "%";
+}
+
+// ── Numpad button handler ─────────────────────────────────────────
+function mosaicNext(userAnswer) {
+  if (userAnswer === undefined) return;
+
+  const q = MOSAIC_DATA[mosaicCurrent];
+  
+  // Save the answer to our running list
+  mosaicAnswers.push({
+    id:             q.id,
+    correct_answer: q.correct_answer,
+    user_answer:    userAnswer,
+    type:           q.type,
+    label:          q.label,
+    description:    q.description,
+  });
+
+  mosaicCurrent++;
+
+  if (mosaicCurrent < MOSAIC_DATA.length) {
+    mosaicLoadPlate(mosaicCurrent); // load next plate
+  } else {
+    mosaicFinish(); // End of test
+  }
+}
+
+// ── Submit to Flask ──────────────────────────────────────────────────────────
+function mosaicFinish() {
+  const field = document.getElementById("mosaicAnswersField");
+  const form  = document.getElementById("mosaicForm");
+  if (field && form) {
+    field.value = JSON.stringify(mosaicAnswers);
+    form.submit();
   }
 }
 

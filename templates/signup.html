@@ -163,7 +163,7 @@
         <div class="logo">Color Vision Detector</div>
         <div class="nav-links">
             <a href="{{ url_for('index') }}">Home</a>
-            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <button onclick="toggleBW()" class="mode-btn">Dark Mode</button>
         </div>
     </nav>
 
@@ -190,14 +190,17 @@
         </div>
 
         <!-- ═══════════════════════════════════════════════
-             STEP 1 — Basic details
+                STEP 1 — Basic details
         ════════════════════════════════════════════════ -->
         <div class="step-panel active" id="step1">
             <div class="form-group">
                 <label>Full Name *</label>
                 <input type="text" id="s1_name" placeholder="John Doe" required>
             </div>
-
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input type="text" id="s1_username" placeholder="johndoe123" required>
+                </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>Age</label>
@@ -228,7 +231,7 @@
         </div>
 
         <!-- ═══════════════════════════════════════════════
-             STEP 2 — OTP verification
+                STEP 2 — OTP verification
         ════════════════════════════════════════════════ -->
         <div class="step-panel" id="step2">
             <p style="color:#ccc; font-size:14px; margin-bottom:20px;">
@@ -239,7 +242,7 @@
                 <div class="form-group">
                     <label>Verification Code</label>
                     <input type="text" id="s2_otp" placeholder="Enter 6-digit code" maxlength="6"
-                           inputmode="numeric" autocomplete="one-time-code">
+                            inputmode="numeric" autocomplete="one-time-code">
                 </div>
                 <button class="otp-send-btn" id="sendOtpBtn" onclick="sendOTP()">
                     Send Code
@@ -260,12 +263,13 @@
         </div>
 
         <!-- ═══════════════════════════════════════════════
-             STEP 3 — Set password & submit
+                STEP 3 — Set password & submit
         ════════════════════════════════════════════════ -->
         <div class="step-panel" id="step3">
             <form method="POST" action="{{ url_for('signup') }}" id="signupForm">
                 <!-- Hidden fields carry data from previous steps -->
                 <input type="hidden" name="name"    id="h_name">
+                <input type="hidden" name="username" id="h_username">
                 <input type="hidden" name="age"     id="h_age">
                 <input type="hidden" name="gender"  id="h_gender">
                 <input type="hidden" name="email"   id="h_email">
@@ -274,7 +278,7 @@
                 <div class="form-group">
                     <label>Create Password *</label>
                     <input type="password" id="s3_pw" name="password" placeholder="At least 8 characters"
-                           oninput="checkStrength(this.value)" required>
+                            oninput="checkStrength(this.value)" required>
                     <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
                     <div class="strength-text" id="strengthText"></div>
                 </div>
@@ -282,7 +286,7 @@
                 <div class="form-group">
                     <label>Re-enter Password *</label>
                     <input type="password" id="s3_pw2" name="password2" placeholder="Same as above"
-                           oninput="checkMatch()" required>
+                            oninput="checkMatch()" required>
                     <div class="match-hint" id="matchHint"></div>
                 </div>
 
@@ -332,6 +336,7 @@
     function goStep1() { setStep(1); }
     function goStep2() {
         var name  = document.getElementById("s1_name").value.trim();
+        var username = document.getElementById("s1_username").value.trim();
         var email = document.getElementById("s1_email").value.trim();
         var err   = document.getElementById("step1Err");
         if (!name) { showErr(err, "Full name is required."); return; }
@@ -424,6 +429,7 @@
                 if (countdown) clearInterval(countdown);
                 // Store token and move on
                 document.getElementById("h_name").value   = document.getElementById("s1_name").value.trim();
+                document.getElementById("h_username").value = document.getElementById("s1_username").value.trim();
                 document.getElementById("h_age").value    = document.getElementById("s1_age").value.trim();
                 document.getElementById("h_gender").value = document.getElementById("s1_gender").value;
                 document.getElementById("h_email").value  = email;

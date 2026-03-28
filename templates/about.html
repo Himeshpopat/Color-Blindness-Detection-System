@@ -54,12 +54,15 @@
 
         <div class="nav-links">
             <a href="{{ url_for('dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('test') }}">Test</a>
-            <a href="{{ url_for('mosaic') }}">D-15 Test</a>
+            <a href="{{ url_for('test') }}">Ishihara</a>
+            <a href="{{ url_for('d15') }}">D-15</a>
+            <a href="{{ url_for('mosaic') }}">Mosaic</a>
+            {% if session.get('user_id') %}
             <a href="{{ url_for('reports') }}">Reports</a>
+            {% endif %}
             <a href="{{ url_for('simulation') }}">Simulation</a>
-            <a href="{{ url_for('about') }}">About</a>
-            <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+            <a href="{{ url_for('about') }}">About CDV</a>
+            <button onclick="toggleBW()" class="mode-btn">Dark Mode</button>
             {% if session.get('user_id') %}
             <a href="{{ url_for('logout') }}">Logout</a>
             {% else %}

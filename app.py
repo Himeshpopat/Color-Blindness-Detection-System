@@ -8,6 +8,8 @@ import smtplib
 import secrets
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from flask import send_file, session, redirect, url_for, request, flash
+
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -62,6 +64,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            username TEXT TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             age INTEGER,
@@ -101,13 +104,23 @@ def save_test_result(test_type: str, score: int, total: int, diagnosis: str,
         (test_type, score, total, diagnosis, ts, answers_json, report_str, user_id),
     )
     row_id = c.lastrowid
+    
+    # --- NEW: DATA ADOPTION LOGIC (Part 1) ---
+    if not user_id:
+        # Save this ID to the session so the user can claim it when they log in/sign up
+        session["guest_test_id"] = row_id
+    # -----------------------------------------
+    
     conn.commit()
     conn.close()
     return row_id
 
 
-def get_all_test_results(user_id=None):
+def get_all_test_results(user_id):
     """Fetch all test results from the database."""
+    # If there is no user_id (user not logged in), return an empty list immediately
+    if user_id is None:
+        return []
     init_db()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -335,10 +348,10 @@ def _score_plate(plate: dict, user_answer: str) -> dict:
     Evaluate a single plate response and return per-type scoring points.
 
     Plate types:
-      vanishing   – Normal sees the digit; colour-blind see nothing.
-      transformation – Normal and colour-blind see different digits.
-      hidden      – Only colour-blind see the digit; normal sees nothing.
-      diagnostic  – Protan and deutan see different digits; normal sees both.
+        vanishing   – Normal sees the digit; colour-blind see nothing.
+        transformation – Normal and colour-blind see different digits.
+        hidden      – Only colour-blind see the digit; normal sees nothing.
+        diagnostic  – Protan and deutan see different digits; normal sees both.
 
     Returns a dict:
         normal_point  – 1 if the answer matches normal vision
@@ -426,13 +439,13 @@ def _score_plate(plate: dict, user_answer: str) -> dict:
 
 
 def build_ishihara_diagnosis(normal_score: int, protan_score: int,
-                              deutan_score: int, total: int,
-                              scored_answers: list = None) -> str:
+                            deutan_score: int, total: int,
+                            scored_answers: list = None) -> str:
     """
     Produce a clinically-graded diagnosis from aggregated plate scores.
 
     The Ishihara series primarily screens for RED-GREEN deficiencies
-    (Protanopia, Protanomaly, Deuteranopia, Deuteranomaly).  The mosaic
+    (Protanopia, Protanomaly, Deuteranopia, Deuteranomaly).  The D15
     test covers blue-yellow (Tritanopia/Tritanomaly) separately.
 
     Severity thresholds (based on standard 38-plate Ishihara guidelines
@@ -450,17 +463,17 @@ def build_ishihara_diagnosis(normal_score: int, protan_score: int,
             protan ≈ deutan               →  Unclassified Red-Green Deficiency
 
         cb_dominated (many vanishing misses, low normal, low protan/deutan)
-            → Possible Red-Green Deficiency (type undetermined)
+            → Possible Red-Green Deficiency (type unclear)
 
     Note: The Ishihara test cannot detect Tritanopia (blue-yellow); that is
-    assessed separately via the Mosaic test.
+    assessed separately via the D15 test.
     """
     if total <= 0:
         return "Insufficient data to determine result."
 
     normal_pct = normal_score / total
     cb_score   = (scored_answers and
-                  sum(1 for a in scored_answers if a.get("result") == "colorblind")) or 0
+                    sum(1 for a in scored_answers if a.get("result") == "colorblind")) or 0
 
     # ── Normal vision ────────────────────────────────────────────────────────
     if normal_pct >= 0.90:
@@ -497,7 +510,7 @@ def build_ishihara_diagnosis(normal_score: int, protan_score: int,
     # Neither protan nor deutan signals dominate but normal score is low →
     # generic red-green deficiency (common when mostly vanishing plates shown).
     if cb_score > 0 or (normal_pct < 0.50):
-        return "Red-Green Color Vision Deficiency (type undetermined)"
+        return "Red-Green Color Vision Deficiency (type unclear)"
 
     return "Possible Color Vision Deficiency (borderline result)"
 
@@ -589,7 +602,7 @@ def _count_crossings(user_order: list) -> dict:
                 return any(abs(cap_id - p) <= 2 for p in pole)
 
             if (near(a, pole1) and near(b, pole2)) or \
-               (near(a, pole2) and near(b, pole1)):
+                (near(a, pole2) and near(b, pole1)):
                 crossings[axis_name] += 1
 
     return crossings
@@ -718,6 +731,156 @@ def diagnose_d15(summary: dict) -> str:
 
     return "Mild Color Vision Anomaly — axis unclear; clinical testing recommended"
 
+# ---- Mosaic (Digit) test configuration ----
+
+# Each mosaic plate visually encodes a single digit (0–9) using
+# a 6x6 grid and two color groups (foreground vs background).
+
+MOSAIC_QUESTIONS = [
+    {
+        "id": 1,
+        "label": "Mosaic Plate 1",
+        "description": "Red–green mosaic forming the digit 3.",
+        "correct_answer": "3",
+        "type": "rg",  # red‑green oriented
+    },
+    {
+        "id": 2,
+        "label": "Mosaic Plate 2",
+        "description": "Red–green mosaic forming the digit 5.",
+        "correct_answer": "5",
+        "type": "rg",
+    },
+    {
+        "id": 3,
+        "label": "Mosaic Plate 3",
+        "description": "Blue–yellow mosaic forming the digit 8.",
+        "correct_answer": "8",
+        "type": "by",  # blue‑yellow oriented
+    },
+    {
+        "id": 4,
+        "label": "Mosaic Plate 4",
+        "description": "Red–green mosaic forming the digit 2.",
+        "correct_answer": "2",
+        "type": "rg",
+    },
+    {
+        "id": 5,
+        "label": "Mosaic Plate 5",
+        "description": "Blue–yellow mosaic forming the digit 9.",
+        "correct_answer": "9",
+        "type": "by",
+    },
+]
+
+
+def diagnose_mosaic_result(summary: dict) -> str:
+    """Return a human readable diagnosis for the mosaic test."""
+    total = summary["total"]
+    correct = summary["correct"]
+    rg_correct = summary["rg_correct"]
+    by_correct = summary["by_correct"]
+
+    accuracy = correct / total if total else 0
+    rg_accuracy = rg_correct / summary["rg_total"] if summary["rg_total"] else 0
+    by_accuracy = by_correct / summary["by_total"] if summary["by_total"] else 0
+
+    if accuracy >= 0.8 and rg_accuracy >= 0.8 and by_accuracy >= 0.8:
+        return "Normal Color Vision"
+    if rg_accuracy < 0.7 and rg_accuracy <= by_accuracy:
+        return "Possible Red-Green Deficiency"
+    if by_accuracy < 0.7 and by_accuracy < rg_accuracy:
+        return "Possible Blue-Yellow Deficiency"
+    return "Borderline or Mild Color Vision Change"
+
+@app.route("/mosaic", methods=["GET"])
+def mosaic():
+    # 1. Create a copy of the mosaic questions so we don't alter the master list
+    shuffled_questions = list(MOSAIC_QUESTIONS)
+    
+    # 2. Shuffle the copied list randomly
+    random.shuffle(shuffled_questions)
+    
+    # 3. Pass the shuffled list to the template
+    return render_template(
+        "mosaic.html", 
+        questions_json=json.dumps(shuffled_questions),
+        total_questions=len(shuffled_questions)
+    )
+    
+@app.route("/submit-mosaic", methods=["POST"])
+def submit_mosaic():
+    # Retrieve the JSON string generated by the Javascript numpad
+    raw_answers = request.form.get("mosaicAnswersJson", "[]")
+    try:
+        answers_list = json.loads(raw_answers)
+    except (json.JSONDecodeError, TypeError):
+        answers_list = []
+
+    # Map answers to a dictionary for easy grading {id: "user_answer"}
+    user_answers_dict = {ans.get("id"): str(ans.get("user_answer", "")) for ans in answers_list}
+
+    details = []
+    correct_count = 0
+    rg_correct = 0
+    by_correct = 0
+    rg_total = sum(1 for q in MOSAIC_QUESTIONS if q["type"] == "rg")
+    by_total = sum(1 for q in MOSAIC_QUESTIONS if q["type"] == "by")
+
+    for q in MOSAIC_QUESTIONS:
+        user_answer = user_answers_dict.get(q["id"], "")
+        is_correct = user_answer == q["correct_answer"]
+        
+        if is_correct:
+            correct_count += 1
+            if q["type"] == "rg":
+                rg_correct += 1
+            else:
+                by_correct += 1
+
+        details.append(
+            {
+                "id": q["id"],
+                "label": q["label"],
+                "description": q["description"],
+                "correct_answer": q["correct_answer"],
+                "user_answer": user_answer or "No answer",
+                "is_correct": is_correct,
+                "type": q["type"],
+            }
+        )
+
+    summary = {
+        "correct": correct_count,
+        "total": len(MOSAIC_QUESTIONS),
+        "rg_correct": rg_correct,
+        "by_correct": by_correct,
+        "rg_total": rg_total,
+        "by_total": by_total,
+    }
+
+    diagnosis = diagnose_mosaic_result(summary)
+
+    report = {
+        "test_name": "Mosaic Color Blindness Test",
+        "kind": "mosaic",
+        "details": details,
+        "summary": summary,
+        "diagnosis": diagnosis,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    store_report(report)
+    save_test_result(
+        test_type="mosaic",
+        score=correct_count,
+        total=len(MOSAIC_QUESTIONS),
+        diagnosis=diagnosis,
+        answers_json=json.dumps(details),
+        report_data=report,
+    )
+    return redirect(url_for("result"))
 
 # ---------------------------------------------------------------------------
 # Session helpers
@@ -861,6 +1024,7 @@ def verify_otp():
 def signup():
     if request.method == "POST":
         name      = request.form.get("name",  "").strip()
+        username = request.form.get("username", "").strip().lower()
         email     = request.form.get("email", "").strip().lower()
         password  = request.form.get("password",  "")
         password2 = request.form.get("password2", "")
@@ -890,13 +1054,15 @@ def signup():
         c = conn.cursor()
         try:
             c.execute(
-                "INSERT INTO users (name, email, password, age, gender) VALUES (?, ?, ?, ?, ?)",
-                (name, email, hashed, age or None, gender or None),
+                "INSERT INTO users (name, username, email, password, age, gender) VALUES (?, ?, ?, ?, ?, ?)",
+                (name, username, email, hashed, age or None, gender or None),
             )
             conn.commit()
             session.pop("otp_verified", None)
             return redirect(url_for("login"))
-        except sqlite3.IntegrityError:
+        except sqlite3.IntegrityError as e:
+            if "username" in str(e):
+                return render_template("signup.html", error="Username already taken.")
             return render_template("signup.html", error="An account with this email already exists.")
         finally:
             conn.close()
@@ -907,25 +1073,42 @@ def signup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email    = request.form.get("email", "").strip()
+        identity = request.form.get("login_identity", "").strip().lower()
         password = request.form.get("password", "")
 
         init_db()
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email = ?", (email,))
+        c.execute("SELECT * FROM users WHERE email = ? OR username =?", (identity, identity))
         user_row = c.fetchone()
-        conn.close()
-
+        
         if user_row and check_password_hash(user_row["password"], password):
             session["user_id"]   = user_row["id"]
-            session["user_name"] = user_row["name"]
+            session["user_name"] = user_row["username"]
+            
+            # --- NEW: DATA ADOPTION LOGIC ---
+            if "guest_test_id" in session:
+                guest_test_id = session.pop("guest_test_id")
+                # Update the orphaned test to belong to this newly logged-in user
+                c.execute("UPDATE test_results SET user_id = ? WHERE id = ?", (user_row["id"], guest_test_id))
+                conn.commit()
+            # --------------------------------
+            
+            conn.close() # Close connection AFTER adoption
+
+            # --- NEW PDF AUTO-DOWNLOAD LOGIC ---
+            if "pending_download" in session:
+                session["auto_download"] = session.pop("pending_download")
+                return redirect(url_for("dashboard"))
+            # -----------------------------------
+            
             return redirect(url_for("dashboard"))
+            
+        conn.close()
         return render_template("login.html", error="Invalid email or password.")
-
+        
     return render_template("login.html")
-
 
 @app.route("/logout")
 def logout():
@@ -935,10 +1118,107 @@ def logout():
 
 
 # ---------------------------------------------------------------------------
+# Forgot Password Routes
+# ---------------------------------------------------------------------------
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        password2 = request.form.get("password2", "")
+        token = request.form.get("reset_token", "")
+
+        if not email or not password:
+            return render_template("forgot_password.html", error="Missing fields.")
+        if len(password) < 8:
+            return render_template("forgot_password.html", error="Password must be at least 8 characters.")
+        if password != password2:
+            return render_template("forgot_password.html", error="Passwords do not match.")
+        
+        # Verify the security token to prevent unauthorized password changes
+        verified = session.get("reset_verified")
+        if not verified or verified.get("email") != email or verified.get("token") != token:
+            return render_template("forgot_password.html", error="Session expired or invalid token. Please try again.")
+
+        # Hash the new password and update the database
+        hashed = generate_password_hash(password)
+        init_db()
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("UPDATE users SET password = ? WHERE email = ?", (hashed, email))
+        conn.commit()
+        conn.close()
+        
+        # Clean up session and redirect to login
+        session.pop("reset_verified", None)
+        flash("Password updated successfully! Please login with your new password.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("forgot_password.html")
+
+
+@app.route("/send-reset-otp", methods=["POST"])
+def send_reset_otp():
+    """Send an OTP only if the email exists in the database."""
+    data = request.get_json(force=True)
+    email = (data.get("email") or "").strip().lower()
+
+    if not email or "@" not in email:
+        return jsonify(ok=False, error="Invalid email address.")
+
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE email = ?", (email,))
+    exists = c.fetchone()
+    conn.close()
+
+    if not exists:
+        return jsonify(ok=False, error="No account found with this email address.")
+
+    otp = str(random.randint(100000, 999999))
+    expiry = (datetime.now() + timedelta(minutes=OTP_EXPIRY_MINUTES)).isoformat()
+    session["reset_otp_data"] = {"email": email, "code": otp, "expiry": expiry}
+
+    ok_flag, err_msg = _send_otp_email(email, otp)
+    if ok_flag:
+        return jsonify(ok=True)
+    return jsonify(ok=False, error=err_msg or "Failed to send email.")
+
+
+@app.route("/verify-reset-otp", methods=["POST"])
+def verify_reset_otp():
+    """Validate the reset OTP."""
+    data = request.get_json(force=True)
+    email = (data.get("email") or "").strip().lower()
+    code = (data.get("otp") or "").strip()
+
+    otp_data = session.get("reset_otp_data")
+
+    if not otp_data:
+        return jsonify(ok=False, error="No request found. Send code first.")
+    if otp_data.get("email") != email:
+        return jsonify(ok=False, error="Email mismatch.")
+    if datetime.now() > datetime.fromisoformat(otp_data["expiry"]):
+        session.pop("reset_otp_data", None)
+        return jsonify(ok=False, error="Code expired. Please request a new one.")
+    if otp_data["code"] != code:
+        return jsonify(ok=False, error="Incorrect code.")
+
+    # Issue a secure token for the password reset form submission
+    token = secrets.token_hex(32)
+    session["reset_verified"] = {"email": email, "token": token}
+    session.pop("reset_otp_data", None)
+    return jsonify(ok=True, token=token)
+
+
+# ---------------------------------------------------------------------------
 # Main pages
 # ---------------------------------------------------------------------------
 
 @app.route("/")
+
 def index():
     return render_template("index.html")
 
@@ -951,22 +1231,51 @@ def dashboard():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
+    user_history = []
+    global_stats = None
+
+    # 1. Define auto_download right here so it ALWAYS exists
+    auto_download = session.pop("auto_download", None)
+
     if user_id:
+        # Fetch logged-in user's personal history
         c.execute(
-            "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data "
+            "SELECT id, test_type, score, total_questions, diagnosis, timestamp "
             "FROM test_results WHERE user_id = ? ORDER BY id DESC LIMIT 5",
             (user_id,),
         )
+        user_history = [dict(row) for row in c.fetchall()]
     else:
-        c.execute(
-            "SELECT id, test_type, score, total_questions, diagnosis, timestamp, answers_json, report_data "
-            "FROM test_results ORDER BY id DESC LIMIT 5"
-        )
-    user_history = [dict(row) for row in c.fetchall()]
+        # Fetch global statistics for guest users
+        c.execute("SELECT COUNT(*) FROM test_results")
+        total_tests = c.fetchone()[0]
+        
+        c.execute("SELECT diagnosis, COUNT(*) as count FROM test_results GROUP BY diagnosis")
+        stats_rows = c.fetchall()
+        
+        # Dictionary to hold merged counts (fixes the chart duplicates)
+        merged_stats = {}
+        for row in stats_rows:
+            raw_diag = row['diagnosis'] if row['diagnosis'] else "Normal Color Vision"
+            clean_diag = raw_diag.replace("blind", "Blind").replace("weak", "Weak").strip()
+            if clean_diag in merged_stats:
+                merged_stats[clean_diag] += row['count']
+            else:
+                merged_stats[clean_diag] = row['count']
+                
+        global_stats = {
+            "total": total_tests,
+            "labels": list(merged_stats.keys()),
+            "data": list(merged_stats.values())
+        }
+    
     conn.close()
-
-    return render_template("dashboard.html", user_history=user_history)
-
+    
+    # 2. Safely pass it to the template
+    return render_template("dashboard.html", 
+                           user_history=user_history, 
+                           global_stats=global_stats,
+                           auto_download=auto_download)
 
 @app.route("/about")
 def about():
@@ -981,10 +1290,25 @@ def simulation():
 @app.route("/reports")
 def reports():
     user_id = session.get("user_id")
+    
+    # If no one is logged in, 'tests' will be an empty list []
     tests = get_all_test_results(user_id)
+    
+    # If user is a guest (not logged in), we can force counts to 0
+    if not user_id:
+        return render_template(
+            "reports.html",
+            tests=[],
+            total_count=0,
+            ishihara_count=0,
+            d15_count=0,
+            mosaic_count=0,
+        )
+
+    # Standard logic for logged-in users...
     ishihara_count = sum(1 for t in tests if t.get("test_type") == "ishihara")
-    mosaic_count   = sum(1 for t in tests if t.get("test_type") == "mosaic")
-    # Strip heavy / non-serialisable fields before passing to tojson in template
+    d15_count   = sum(1 for t in tests if t.get("test_type") == "d15")
+    mosaic_count = sum(1 for t in tests if t.get("test_type") == "mosaic")
     tests_safe = [
         {
             "id":              t["id"],
@@ -996,11 +1320,13 @@ def reports():
         }
         for t in tests
     ]
+    
     return render_template(
         "reports.html",
         tests=tests_safe,
         total_count=len(tests_safe),
         ishihara_count=ishihara_count,
+        d15_count=d15_count,
         mosaic_count=mosaic_count,
     )
 
@@ -1015,10 +1341,10 @@ def test():
     Select 10 random plates from the full 15-plate bank on every visit.
 
     Selection strategy (ensures diagnostic quality):
-      1. Always include BOTH diagnostic plates (ids 14 & 15).
-      2. Always include at least 2 transformation plates for protan/deutan evidence.
-      3. Fill remaining slots randomly from vanishing + leftover transformation.
-      4. Shuffle the final 10 before sending so question order varies each run.
+        1. Always include BOTH diagnostic plates (ids 14 & 15).
+        2. Always include at least 2 transformation plates for protan/deutan evidence.
+        3. Fill remaining slots randomly from vanishing + leftover transformation.
+        4. Shuffle the final 10 before sending so question order varies each run.
     """
     TARGET = 10
 
@@ -1032,7 +1358,7 @@ def test():
     # Guarantee at least 2 transformation plates
     min_transform = 2
     transform_pick = random.sample(transformation_plates,
-                                   min(min_transform, len(transformation_plates)))
+                                    min(min_transform, len(transformation_plates)))
     selected.extend(transform_pick)
 
     # Fill remaining slots from unused transformation + vanishing plates
@@ -1042,7 +1368,7 @@ def test():
     remaining_needed = TARGET - len(selected)
     if remaining_needed > 0:
         selected.extend(random.sample(remaining_pool,
-                                      min(remaining_needed, len(remaining_pool))))
+                                        min(remaining_needed, len(remaining_pool))))
 
     random.shuffle(selected)
 
@@ -1152,16 +1478,16 @@ def ishihara_submit():
 # Farnsworth D-15 test routes
 # ---------------------------------------------------------------------------
 
-@app.route("/mosaic", methods=["GET"])
-def mosaic():
+@app.route("/d15", methods=["GET"])
+def d15():
     """Render the Farnsworth D-15 drag-and-drop arrangement test."""
-    return render_template("mosaic.html")
+    return render_template("d15.html")
 
 
-@app.route("/submit-mosaic", methods=["POST"])
-def submit_mosaic():
+@app.route("/submit-d15", methods=["POST"])
+def submit_d15():
     """
-    Receive the user's cap arrangement from mosaic.html, score it using
+    Receive the user's cap arrangement from d15.html, score it using
     the D-15 error-score and confusion-axis crossing algorithm, then
     build a full report and redirect to the result page.
     """
@@ -1181,7 +1507,7 @@ def submit_mosaic():
 
     report = {
         "test_name": "Farnsworth D-15 Color Vision Test",
-        "kind":      "mosaic",
+        "kind":      "d15",
         "details":   summary,          # full_order, sequence, axis_crossings …
         "summary":   summary,          # result.html reads from both keys
         "diagnosis": diagnosis,
@@ -1190,7 +1516,7 @@ def submit_mosaic():
 
     store_report(report)
     save_test_result(
-        test_type="mosaic",
+        test_type="d15",
         score=max(0, 100 - summary["total_error_score"]),  # normalised score
         total=100,
         diagnosis=diagnosis,
@@ -1227,25 +1553,71 @@ def report_detail(report_id):
             pass
 
     if not report_data:
+        kind = row["test_type"]
         report_data = {
             "test_name": f"{row['test_type'].title()} Test",
-            "kind":      row["test_type"],
+            "kind":      kind,
             "diagnosis": row["diagnosis"],
             "timestamp": row["timestamp"],
-            "details": {
+        }
+
+        if kind == "d15":
+            # Rebuild summary from answers_json (which stores the sequence list)
+            sequence = []
+            full_order = list(range(16))  # fallback: correct order
+            if row.get("answers_json"):
+                try:
+                    sequence = json.loads(row["answers_json"])
+                    full_order = [item["cap_id"] for item in sequence]
+                except (json.JSONDecodeError, TypeError, KeyError):
+                    pass
+
+            # Re-score from the stored sequence so all fields exist
+            rebuilt_summary = score_d15(full_order)
+            report_data["summary"] = rebuilt_summary
+            report_data["details"] = rebuilt_summary
+
+        elif kind == "mosaic":
+            details_list = []
+            if row.get("answers_json"):
+                try:
+                    details_list = json.loads(row["answers_json"])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            rg_total   = sum(1 for a in details_list if a.get("type") == "rg")
+            by_total   = sum(1 for a in details_list if a.get("type") == "by")
+            rg_correct = sum(1 for a in details_list if a.get("type") == "rg" and a.get("is_correct"))
+            by_correct = sum(1 for a in details_list if a.get("type") == "by" and a.get("is_correct"))
+            correct    = sum(1 for a in details_list if a.get("is_correct"))
+            total      = len(details_list) or row["total_questions"]
+            summary = {
+                "correct":    correct,
+                "total":      total,
+                "rg_correct": rg_correct,
+                "rg_total":   rg_total,
+                "by_correct": by_correct,
+                "by_total":   by_total,
+            }
+            report_data["summary"] = summary
+            report_data["details"] = details_list
+
+        else:
+            # Ishihara fallback
+            answers = []
+            if row.get("answers_json"):
+                try:
+                    answers = json.loads(row["answers_json"])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            report_data["details"] = {
                 "normal_score":    row["score"],
                 "total_questions": row["total_questions"],
                 "percentage":      round(
                     (row["score"] / row["total_questions"]) * 100
                 ) if row["total_questions"] else 0,
-            },
-            "summary": {"correct": row["score"], "total": row["total_questions"]},
-        }
-        if row.get("answers_json"):
-            try:
-                report_data["details"]["answers"] = json.loads(row["answers_json"])
-            except (json.JSONDecodeError, TypeError):
-                pass
+                "answers": answers,
+            }
+            report_data["summary"] = {"correct": row["score"], "total": row["total_questions"]}
 
     return render_template(
         "result.html", report=report_data, from_history=True, report_id=report_id
@@ -1258,6 +1630,11 @@ def report_detail(report_id):
 
 @app.route("/download-ishihara-report")
 def download_ishihara_report():
+    # 1. Enforce login and remember the requested download URL
+    if not session.get("user_id"):
+        session["pending_download"] = request.url
+        return redirect(url_for("login"))
+
     report_id = request.args.get("id", type=int)
     if report_id:
         row = get_test_result_by_id(report_id)
@@ -1277,6 +1654,11 @@ def download_ishihara_report():
 
 @app.route("/download-report")
 def download_report():
+    # 1. Enforce login and remember the requested download URL
+    if not session.get("user_id"):
+        session["pending_download"] = request.url
+        return redirect(url_for("login"))
+
     report_id = request.args.get("id", type=int)
     if report_id:
         row = get_test_result_by_id(report_id)
@@ -1290,7 +1672,33 @@ def download_report():
     report = session.get("last_report")
     if not report:
         return redirect(url_for("index"))
-    return _generate_pdf_report(report, "color_vision_report.pdf")
+    return _generate_pdf_report(report, "d15_report.pdf")
+
+
+@app.route("/download-mosaic-report")
+def download_mosaic_report():
+    # 1. Enforce login and remember the requested download URL
+    if not session.get("user_id"):
+        session["pending_download"] = request.url
+        return redirect(url_for("login"))
+
+    report_id = request.args.get("id", type=int)
+    if report_id:
+        row = get_test_result_by_id(report_id)
+        if row and row.get("report_data"):
+            try:
+                report = json.loads(row["report_data"])
+                if report.get("kind") == "mosaic":
+                    return _generate_pdf_report(report, "mosaic_report.pdf")
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return redirect(url_for("reports"))
+    
+    report = session.get("last_report")
+    if report and report.get("kind") == "mosaic":
+        return _generate_pdf_report(report, "mosaic_report.pdf")
+    
+    return redirect(url_for("index"))
 
 
 # ---------------------------------------------------------------------------
@@ -1342,7 +1750,42 @@ def _generate_pdf_report(report: dict, filename: str):
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#cccccc")))
     story.append(Spacer(1, 8))
 
+    # ---- NEW: Patient Information Block ----
+    user_id = session.get("user_id")
+    if user_id:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT name, username, email, age, gender FROM users WHERE id = ?", (user_id,))
+        user_info = c.fetchone()
+        conn.close()
+
+        if user_info:
+            story.append(Paragraph("Patient Information", heading_style))
+            patient_data = [
+                ["Name", user_info["name"] or "-"],
+                ["Username", user_info["username"] or "-"],
+                ["Email", user_info["email"] or "-"],
+                ["Age", str(user_info["age"]) if user_info["age"] else "-"],
+                ["Gender", user_info["gender"] or "-"],
+            ]
+            patient_table = Table(patient_data, colWidths=[1.8 * inch, 5 * inch])
+            patient_table.setStyle(TableStyle([
+                ("BACKGROUND",   (0, 0), (0, -1), colors.HexColor("#e8eaf6")),
+                ("FONTNAME",     (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE",     (0, 0), (-1, -1), 11),
+                ("ROWBACKGROUNDS", (1, 0), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+                ("GRID",         (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+                ("TOPPADDING",   (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING",(0, 0), (-1, -1), 6),
+                ("LEFTPADDING",  (0, 0), (-1, -1), 8),
+            ]))
+            story.append(patient_table)
+            story.append(Spacer(1, 14))
+    # ----------------------------------------
+
     # Summary info table
+    story.append(Paragraph("Diagnosis Overview", heading_style))
     diagnosis = report.get("diagnosis", "-")
     timestamp = report.get("timestamp", "-")
     kind      = report.get("kind", "")
@@ -1366,7 +1809,7 @@ def _generate_pdf_report(report: dict, filename: str):
     story.append(Spacer(1, 14))
 
     # ---- Farnsworth D-15 detail ----
-    if kind == "mosaic":
+    if kind == "d15":
         summary = report.get("summary", {})
         story.append(Paragraph("Score Summary", heading_style))
         score_data = [
@@ -1488,7 +1931,65 @@ def _generate_pdf_report(report: dict, filename: str):
                 ("LEFTPADDING",  (0, 0), (-1, -1), 6),
             ] + result_colors))
             story.append(a_table)
+            
+    # ---- Mosaic detail ----
+    elif kind == "mosaic":
+        summary = report.get("summary", {})
+        story.append(Paragraph("Score Summary", heading_style))
+        
+        score_data = [
+            ["Metric", "Result"],
+            ["Total Questions", str(summary.get('total', 0))],
+            ["Correct Answers", str(summary.get('correct', 0))],
+            ["Red-Green Correct", f"{summary.get('rg_correct', 0)} / {summary.get('rg_total', 0)}"],
+            ["Blue-Yellow Correct", f"{summary.get('by_correct', 0)} / {summary.get('by_total', 0)}"],
+        ]
+        score_table = Table(score_data, colWidths=[2.5 * inch, 4.3 * inch])
+        score_table.setStyle(TableStyle([
+            ("BACKGROUND",   (0, 0), (-1, 0), colors.HexColor("#3949ab")),
+            ("TEXTCOLOR",    (0, 0), (-1, 0), colors.white),
+            ("FONTNAME",     (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",     (0, 0), (-1, -1), 11),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID",         (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+            ("TOPPADDING",   (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 6),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 8),
+        ]))
+        story.append(score_table)
+        story.append(Spacer(1, 14))
 
+        details = report.get("details", [])
+        if details:
+            story.append(Paragraph("Answer Details", heading_style))
+            a_data = [["Question", "Expected", "Your Answer", "Result"]]
+            for item in details:
+                a_data.append([
+                    f"Q{item['id']} - {item['label']}",
+                    str(item.get("correct_answer", "")),
+                    str(item.get("user_answer", "")),
+                    "Correct" if item.get("is_correct") else "Incorrect"
+                ])
+            
+            a_table = Table(a_data, colWidths=[2.3 * inch, 1.3 * inch, 1.5 * inch, 1.7 * inch])
+            result_colors = [
+                ("TEXTCOLOR", (3, i + 1), (3, i + 1),
+                 colors.HexColor("#2e7d32") if row[3] == "Correct" else colors.HexColor("#c62828"))
+                for i, row in enumerate(a_data[1:])
+            ]
+            a_table.setStyle(TableStyle([
+                ("BACKGROUND",   (0, 0), (-1, 0), colors.HexColor("#3949ab")),
+                ("TEXTCOLOR",    (0, 0), (-1, 0), colors.white),
+                ("FONTNAME",     (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE",     (0, 0), (-1, -1), 10),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+                ("GRID",         (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+                ("TOPPADDING",   (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
+                ("LEFTPADDING",  (0, 0), (-1, -1), 6),
+            ] + result_colors))
+            story.append(a_table)
+            
     doc.build(story)
     buffer.seek(0)
     return send_file(
@@ -1497,7 +1998,6 @@ def _generate_pdf_report(report: dict, filename: str):
         as_attachment=True,
         download_name=filename,
     )
-
 
 # ---------------------------------------------------------------------------
 # Entry point

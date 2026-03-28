@@ -9,12 +9,8 @@
     <div class="logo">Color Vision Detector</div>
     <div class="nav-links">
       <a href="{{ url_for('dashboard') }}">Dashboard</a>
-      <a href="{{ url_for('test') }}">Ishihara Test</a>
-      <a href="{{ url_for('mosaic') }}">D-15 Test</a>
-      <a href="{{ url_for('reports') }}">Reports</a>
-      <a href="{{ url_for('simulation') }}">Simulation</a>
       <a href="{{ url_for('about') }}">About CVD</a>
-      <button onclick="toggleBW()" class="mode-btn">B/W Mode</button>
+      <button onclick="toggleBW()" class="mode-btn">Dark Mode</button>
       {% if session.get('user_id') %}
       <a href="{{ url_for('logout') }}">Logout</a>
       {% else %}
@@ -25,10 +21,14 @@
 
   <section class="hero">
     <h1>Color Vision Deficiency Detection</h1>
-    <p>Take an Ishihara or Farnsworth D-15 test and analyze your color vision.</p>
+    <p>Take an Ishihara/Farnsworth D-15 test/Mosaic Test and analyze your color vision.</p>
     <button onclick="window.location.href='{{ url_for('test') }}'">Start Ishihara Test</button>
     <br><br>
-    <button onclick="window.location.href='{{ url_for('mosaic') }}'">Farnsworth D-15 Test</button>
+    <button onclick="window.location.href='{{ url_for('d15') }}'">Farnsworth D-15 Test</button>
+    <br><br>
+    <button onclick="window.location.href='{{ url_for('mosaic') }}'">Mosaic Test</button>
+    <br><br>
+    <button onclick="window.location.href='{{ url_for('simulation') }}'">Try Simulation</button>
   </section>
 
   <div class="bubbles">
