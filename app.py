@@ -9,10 +9,7 @@ import secrets
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import send_file, session, redirect, url_for, request, flash
-
-
 from werkzeug.security import generate_password_hash, check_password_hash
-
 from flask import (
     Flask,
     render_template,
@@ -24,26 +21,16 @@ from flask import (
     jsonify,
 )
 
-
 app = Flask(__name__)
-app.secret_key = "change-this-secret-key"  # required for session usage
+app.secret_key = "change-this-secret-key"
 
-# ---------------------------------------------------------------------------
 # Email / OTP configuration
-# In Gmail → Settings → Security → 2-Step Verification → App Passwords,
-# generate an app password for "Mail" and paste it below.
-# ---------------------------------------------------------------------------
 OTP_SENDER_EMAIL    = "societysynced@gmail.com"
 OTP_SENDER_PASSWORD = "tvqtykupebrbcfon"   # ← paste app password here
 OTP_EXPIRY_MINUTES  = 10
 
-# ---------------------------------------------------------------------------
 # Database
-# ---------------------------------------------------------------------------
-
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_results.db")
-
-
 def init_db():
     """Initialize SQLite database and create tables if they don't exist."""
     conn = sqlite3.connect(DB_PATH)
@@ -86,9 +73,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-
-def save_test_result(test_type: str, score: int, total: int, diagnosis: str,
-                     answers_json: str = None, report_data: dict = None) -> int:
+def save_test_result(test_type: str, score: int, total: int, diagnosis: str, answers_json: str = None, report_data: dict = None) -> int:
     """Save a test result to the database. Returns the new row id."""
     init_db()
     conn = sqlite3.connect(DB_PATH)
@@ -105,16 +90,13 @@ def save_test_result(test_type: str, score: int, total: int, diagnosis: str,
     )
     row_id = c.lastrowid
     
-    # --- NEW: DATA ADOPTION LOGIC (Part 1) ---
     if not user_id:
         # Save this ID to the session so the user can claim it when they log in/sign up
         session["guest_test_id"] = row_id
-    # -----------------------------------------
     
     conn.commit()
     conn.close()
     return row_id
-
 
 def get_all_test_results(user_id):
     """Fetch all test results from the database."""
@@ -156,23 +138,14 @@ def get_test_result_by_id(result_id: int) -> dict | None:
     conn.close()
     return dict(row) if row else None
 
-
-# ---------------------------------------------------------------------------
-# Ishihara plate definitions
-#
+# Ishihara Test
 # Plate types:
 #   "vanishing"      – only normal vision sees the digit; CB sees nothing ("")
 #   "transformation" – normal and CB see different digits
 #   "hidden"         – only CB sees the digit; normal vision sees nothing ("")
 #   "diagnostic"     – distinguishes Protan from Deutan (different CB answers)
-#
-# Sources: standard 38-plate Ishihara series (1917, revised editions).
-# Images are assumed to be named test1.png … test10.png in static/images/.
-# ---------------------------------------------------------------------------
-
 ISHIHARA_PLATES = [
     # Plate 1 — orange digits on grey background.
-    # Normal: 12 | Color-blind: cannot see (vanishing).
     {
         "id": 1,
         "image": "plate1.png",
@@ -183,7 +156,6 @@ ISHIHARA_PLATES = [
         "description": "12",
     },
     # Plate 2 — red/pink digits on yellow-green background.
-    # Normal: 8 | Color-blind: 3
     {
         "id": 2,
         "image": "plate2.png",
@@ -194,7 +166,6 @@ ISHIHARA_PLATES = [
         "description": "8",
     },
     # Plate 3 — red digits on yellow-green background.
-    # Normal: 29 | Color-blind: 70
     {
         "id": 3,
         "image": "plate3.png",
@@ -205,7 +176,6 @@ ISHIHARA_PLATES = [
         "description": "29",
     },
     # Plate 4 — green on orange/red. Normal: 5.
-    # Color-blind see a different digit: 2.
     {
         "id": 4,
         "image": "plate4.png",
@@ -216,7 +186,6 @@ ISHIHARA_PLATES = [
         "description": "5",
     },
     # Plate 5 — green on red/orange.
-    # Normal: 3 | Color-blind: 5
     {
         "id": 5,
         "image": "plate5.png",
@@ -227,7 +196,6 @@ ISHIHARA_PLATES = [
         "description": "3",
     },
     # Plate 6 — green/yellow on red-orange.
-    # Normal: 15 | Color-blind: 17
     {
         "id": 6,
         "image": "plate6.png",
@@ -238,7 +206,6 @@ ISHIHARA_PLATES = [
         "description": "15",
     },
     # Plate 7 — green on orange/red.
-    # Normal: 74 | Color-blind: 21
     {
         "id": 7,
         "image": "plate7.png",
@@ -248,8 +215,7 @@ ISHIHARA_PLATES = [
         "deutan_answer": "21",
         "description": "74",
     },
-    # Plate 8 — orange digits on yellow-green/grey background.
-    # Normal: 6 | Color-blind: nothing (vanishing).
+    # Plate 8 — orange digits on yellow-green background.
     {
         "id": 8,
         "image": "plate8.png",
@@ -260,7 +226,6 @@ ISHIHARA_PLATES = [
         "description": "6",
     },
     # Plate 9 — orange digits on olive/grey background.
-    # Normal: 45 | Color-blind: nothing (vanishing).
     {
         "id": 9,
         "image": "plate9.png",
@@ -271,7 +236,6 @@ ISHIHARA_PLATES = [
         "description": "45",
     },
     # Plate 10 — mixed red-green field.
-    # Normal: 5 | Color-blind: nothing (vanishing).
     {
         "id": 10,
         "image": "plate10.png",
@@ -282,7 +246,6 @@ ISHIHARA_PLATES = [
         "description": "5",
     },
     # Plate 11 — green digit on red/yellow background.
-    # Normal: 7 | Color-blind: nothing (vanishing).
     {
         "id": 11,
         "image": "plate11.png",
@@ -293,7 +256,6 @@ ISHIHARA_PLATES = [
         "description": "7",
     },
     # Plate 12 — green digits on red/yellow background.
-    # Normal: 16 | Color-blind: nothing (vanishing).
     {
         "id": 12,
         "image": "plate12.png",
@@ -304,7 +266,6 @@ ISHIHARA_PLATES = [
         "description": "16",
     },
     # Plate 13 — green digits on red/yellow background.
-    # Normal: 73 | Color-blind: nothing (vanishing).
     {
         "id": 13,
         "image": "plate13.png",
@@ -315,7 +276,6 @@ ISHIHARA_PLATES = [
         "description": "73",
     },
     # Plate 14 — diagnostic: red vs purple digits on grey.
-    # Normal: 26 | Protan: 6 | Deutan: 2
     {
         "id": 14,
         "image": "plate14.png",
@@ -326,7 +286,6 @@ ISHIHARA_PLATES = [
         "description": "26",
     },
     # Plate 15 — diagnostic: red vs purple digits on grey.
-    # Normal: 42 | Protan: 2 | Deutan: 4
     {
         "id": 15,
         "image": "plate15.png",
@@ -338,11 +297,7 @@ ISHIHARA_PLATES = [
     },
 ]
 
-
-# ---------------------------------------------------------------------------
 # Ishihara diagnosis logic
-# ---------------------------------------------------------------------------
-
 def _score_plate(plate: dict, user_answer: str) -> dict:
     """
     Evaluate a single plate response and return per-type scoring points.
@@ -365,21 +320,15 @@ def _score_plate(plate: dict, user_answer: str) -> dict:
     protan = (plate.get("protan_answer") or "").strip().lower()
     deutan = (plate.get("deutan_answer") or "").strip().lower()
     ptype  = plate["type"]
-
     result = "incorrect"
     normal_point = protan_point = deutan_point = 0
-
     # Helper: does the user claim to see nothing?
     sees_nothing = ua in ("", "nothing", "none", "0", "x", "-")
-
     if ptype == "vanishing":
-        # Normal vision reads the digit; colour-blind eyes lose it in the bg.
-        # Some vanishing plates also have a known CB answer (e.g. plate 4).
         if ua == normal:
             result = "normal"
             normal_point = 1
         elif protan and ua == protan:
-            # CB sees a different digit on this plate
             result = "protan"
             protan_point = 1
         elif deutan and deutan != protan and ua == deutan:
@@ -389,7 +338,6 @@ def _score_plate(plate: dict, user_answer: str) -> dict:
             result = "colorblind"   # red-green deficiency confirmed
 
     elif ptype == "transformation":
-        # Normal and colour-blind perceive entirely different digits.
         if ua == normal:
             result = "normal"
             normal_point = 1
@@ -403,7 +351,6 @@ def _score_plate(plate: dict, user_answer: str) -> dict:
             result = "colorblind"
 
     elif ptype == "hidden":
-        # Only colour-blind individuals detect the digit.
         if sees_nothing:
             result = "normal"
             normal_point = 1
@@ -415,8 +362,6 @@ def _score_plate(plate: dict, user_answer: str) -> dict:
             deutan_point = 1
 
     elif ptype == "diagnostic":
-        # Differentiates protan from deutan; both miss what the other sees.
-        # Normal vision sees both digits combined (e.g. "26").
         if ua == normal:
             result = "normal"
             normal_point = 1
@@ -436,7 +381,6 @@ def _score_plate(plate: dict, user_answer: str) -> dict:
         "cb_point":     cb_point,
         "result":       result,
     }
-
 
 def build_ishihara_diagnosis(normal_score: int, protan_score: int,
                             deutan_score: int, total: int,
@@ -474,22 +418,18 @@ def build_ishihara_diagnosis(normal_score: int, protan_score: int,
     normal_pct = normal_score / total
     cb_score   = (scored_answers and
                     sum(1 for a in scored_answers if a.get("result") == "colorblind")) or 0
-
-    # ── Normal vision ────────────────────────────────────────────────────────
+    #Normal vision
     if normal_pct >= 0.90:
         return "Normal Color Vision"
-
-    # ── Borderline / mild ────────────────────────────────────────────────────
+    #Borderline / mild
     if normal_pct >= 0.70:
-        # Still try to name the sub-type if diagnostic plates gave a clear signal
         if protan_score > 0 and protan_score > deutan_score:
             return "Mild Protanomaly (Weak Red Sensitivity)"
         if deutan_score > 0 and deutan_score > protan_score:
             return "Mild Deuteranomaly (Weak Green Sensitivity)"
         return "Mild Color Vision Deficiency (type unclear)"
 
-    # ── Significant deficiency – classify sub-type ───────────────────────────
-    # Weighted ratio to avoid noise from single diagnostic plates.
+    #Significant deficiency – classify sub-type
     protan_dominant = protan_score > deutan_score
     deutan_dominant = deutan_score > protan_score
 
@@ -514,14 +454,8 @@ def build_ishihara_diagnosis(normal_score: int, protan_score: int,
 
     return "Possible Color Vision Deficiency (borderline result)"
 
-
-# ---------------------------------------------------------------------------
 # Farnsworth D-15 — cap definitions & scoring
-#
-# 16 caps evenly spaced around the hue wheel (22.5° apart), starting at
-# purple (hue 270°). Hex values must stay identical to D15_CAPS in script.js.
 # Correct arrangement order: 0 → 1 → 2 → … → 15.
-# ---------------------------------------------------------------------------
 
 D15_CAPS = [
     {"id":  0, "label": "Cap 0",  "hex": "#9351d6"},  # 270° violet-purple   — reference (fixed)
@@ -541,28 +475,19 @@ D15_CAPS = [
     {"id": 14, "label": "Cap 14", "hex": "#6b4dd6"},  # 225° blue-violet
     {"id": 15, "label": "Cap 15", "hex": "#5e4dd6"},  # 248° indigo          — end cap (fixed)
 ]
-
 # Correct sequence: 0,1,2,…,15
 CORRECT_D15_ORDER = list(range(16))
 
-# ---------------------------------------------------------------------------
 # Confusion-axis vectors (Vingrys & King-Smith 1988)
-#
-# Each entry defines a named axis by its two "poles" in cap-id space.
-# When a user's connecting lines repeatedly cross the area between two
-# specific cap ids, it indicates confusion along that axis.
-#
+
 # Protan  axis: roughly caps 1–2  ↔  caps 9–10  (blue-purple ↔ olive-yellow)
 # Deutan  axis: roughly caps 3–4  ↔  caps 11–12 (cyan-blue   ↔ orange-red)
 # Tritan  axis: roughly caps 5–6  ↔  caps 13–14 (green-teal  ↔ red-pink)
-# ---------------------------------------------------------------------------
-
 D15_CONFUSION_AXES = {
     "Protan":  (frozenset({1, 2}),  frozenset({9,  10})),
     "Deutan":  (frozenset({3, 4}),  frozenset({11, 12})),
     "Tritan":  (frozenset({5, 6}),  frozenset({13, 14})),
 }
-
 
 def _step_error(a: int, b: int) -> int:
     """
@@ -575,7 +500,6 @@ def _step_error(a: int, b: int) -> int:
     Reference: Bowman (1982), Vingrys & King-Smith (1988).
     """
     return max(0, abs(b - a) - 1)
-
 
 def _count_crossings(user_order: list) -> dict:
     """
@@ -595,18 +519,14 @@ def _count_crossings(user_order: list) -> dict:
         step_set = frozenset({a, b})
 
         for axis_name, (pole1, pole2) in D15_CONFUSION_AXES.items():
-            # A crossing occurs when one endpoint is near pole1 and the other
-            # is near pole2 (or vice versa).  We use a generous neighbourhood
-            # of ±2 caps around each pole centre.
             def near(cap_id, pole):
                 return any(abs(cap_id - p) <= 2 for p in pole)
 
             if (near(a, pole1) and near(b, pole2)) or \
                 (near(a, pole2) and near(b, pole1)):
                 crossings[axis_name] += 1
-
+    
     return crossings
-
 
 def score_d15(user_order: list) -> dict:
     """
@@ -665,7 +585,6 @@ def score_d15(user_order: list) -> dict:
         "full_order":        user_order,
     }
 
-
 def diagnose_d15(summary: dict) -> str:
     """
     Produce a diagnosis from the D-15 scoring summary.
@@ -685,14 +604,14 @@ def diagnose_d15(summary: dict) -> str:
     axis   = summary.get("confusion_axis")
     ac     = summary.get("axis_crossings", {})
 
-    # ── Normal ──────────────────────────────────────────────────────────────
+    #Normal
     if error == 0 and cross == 0:
         return "Normal Color Vision"
 
     if error <= 4 and cross == 0:
         return "Near Normal Color Vision (minor arrangement errors)"
 
-    # ── Single crossing — borderline ─────────────────────────────────────────
+    #Single crossing — borderline
     if cross == 1:
         if axis == "Protan":
             return "Borderline — Possible Mild Protanomaly (Weak Red Sensitivity)"
@@ -702,7 +621,7 @@ def diagnose_d15(summary: dict) -> str:
             return "Borderline — Possible Mild Tritanomaly (Weak Blue-Yellow Sensitivity)"
         return "Borderline Color Vision — single confusion-axis crossing detected"
 
-    # ── Multiple crossings — significant deficiency ──────────────────────────
+    #Multiple crossings — significant deficiency
     protan_cross = ac.get("Protan", 0)
     deutan_cross = ac.get("Deutan", 0)
     tritan_cross = ac.get("Tritan", 0)
@@ -727,7 +646,7 @@ def diagnose_d15(summary: dict) -> str:
 
     # Mixed — errors spread across multiple axes
     if cross >= 4:
-        return "General Color Vision Deficiency (multiple confusion axes affected)"
+        return "General Color Vision Deficiency"
 
     return "Mild Color Vision Anomaly — axis unclear; clinical testing recommended"
 
@@ -882,22 +801,14 @@ def submit_mosaic():
     )
     return redirect(url_for("result"))
 
-# ---------------------------------------------------------------------------
 # Session helpers
-# ---------------------------------------------------------------------------
-
 def store_report(report: dict) -> None:
     """Store the latest report in the session."""
     session["last_report"] = report
 
 
-# ---------------------------------------------------------------------------
 # Auth routes
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # OTP helpers
-# ---------------------------------------------------------------------------
 
 def _send_otp_email(to_email: str, otp_code: str) -> tuple[bool, str]:
     """
@@ -1087,22 +998,18 @@ def login():
             session["user_id"]   = user_row["id"]
             session["user_name"] = user_row["username"]
             
-            # --- NEW: DATA ADOPTION LOGIC ---
             if "guest_test_id" in session:
                 guest_test_id = session.pop("guest_test_id")
-                # Update the orphaned test to belong to this newly logged-in user
                 c.execute("UPDATE test_results SET user_id = ? WHERE id = ?", (user_row["id"], guest_test_id))
                 conn.commit()
-            # --------------------------------
             
             conn.close() # Close connection AFTER adoption
-
-            # --- NEW PDF AUTO-DOWNLOAD LOGIC ---
+            
+            #PDF AUTO-DOWNLOAD LOGIC
             if "pending_download" in session:
                 session["auto_download"] = session.pop("pending_download")
                 return redirect(url_for("dashboard"))
-            # -----------------------------------
-            
+        
             return redirect(url_for("dashboard"))
             
         conn.close()
@@ -1116,10 +1023,7 @@ def logout():
     session.pop("user_name", None)
     return redirect(url_for("index"))
 
-
-# ---------------------------------------------------------------------------
 # Forgot Password Routes
-# ---------------------------------------------------------------------------
 
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
@@ -1212,11 +1116,7 @@ def verify_reset_otp():
     session.pop("reset_otp_data", None)
     return jsonify(ok=True, token=token)
 
-
-# ---------------------------------------------------------------------------
 # Main pages
-# ---------------------------------------------------------------------------
-
 @app.route("/")
 
 def index():
@@ -1234,7 +1134,6 @@ def dashboard():
     user_history = []
     global_stats = None
 
-    # 1. Define auto_download right here so it ALWAYS exists
     auto_download = session.pop("auto_download", None)
 
     if user_id:
@@ -1253,7 +1152,7 @@ def dashboard():
         c.execute("SELECT diagnosis, COUNT(*) as count FROM test_results GROUP BY diagnosis")
         stats_rows = c.fetchall()
         
-        # Dictionary to hold merged counts (fixes the chart duplicates)
+        # Dictionary to hold merged counts
         merged_stats = {}
         for row in stats_rows:
             raw_diag = row['diagnosis'] if row['diagnosis'] else "Normal Color Vision"
@@ -1271,7 +1170,6 @@ def dashboard():
     
     conn.close()
     
-    # 2. Safely pass it to the template
     return render_template("dashboard.html", 
                            user_history=user_history, 
                            global_stats=global_stats,
@@ -1330,11 +1228,7 @@ def reports():
         mosaic_count=mosaic_count,
     )
 
-
-# ---------------------------------------------------------------------------
 # Ishihara test
-# ---------------------------------------------------------------------------
-
 @app.route("/test")
 def test():
     """
@@ -1352,7 +1246,7 @@ def test():
     transformation_plates = [p for p in ISHIHARA_PLATES if p["type"] == "transformation"]
     vanishing_plates     = [p for p in ISHIHARA_PLATES if p["type"] == "vanishing"]
 
-    # Fixed: all diagnostic plates (currently 2)
+    # Fixed: all diagnostic plates
     selected = list(diagnostic_plates)
 
     # Guarantee at least 2 transformation plates
@@ -1378,7 +1272,6 @@ def test():
         plates_json=json.dumps(selected),
         total_questions=len(selected),
     )
-
 
 @app.route("/ishihara-submit", methods=["POST"])
 def ishihara_submit():
@@ -1473,11 +1366,7 @@ def ishihara_submit():
     )
     return redirect(url_for("result"))
 
-
-# ---------------------------------------------------------------------------
 # Farnsworth D-15 test routes
-# ---------------------------------------------------------------------------
-
 @app.route("/d15", methods=["GET"])
 def d15():
     """Render the Farnsworth D-15 drag-and-drop arrangement test."""
@@ -1525,11 +1414,7 @@ def submit_d15():
     )
     return redirect(url_for("result"))
 
-
-# ---------------------------------------------------------------------------
 # Result & report views
-# ---------------------------------------------------------------------------
-
 @app.route("/result")
 def result():
     report = session.get("last_report")
@@ -1623,11 +1508,7 @@ def report_detail(report_id):
         "result.html", report=report_data, from_history=True, report_id=report_id
     )
 
-
-# ---------------------------------------------------------------------------
 # PDF download routes
-# ---------------------------------------------------------------------------
-
 @app.route("/download-ishihara-report")
 def download_ishihara_report():
     # 1. Enforce login and remember the requested download URL
@@ -1700,11 +1581,7 @@ def download_mosaic_report():
     
     return redirect(url_for("index"))
 
-
-# ---------------------------------------------------------------------------
 # PDF generation
-# ---------------------------------------------------------------------------
-
 def _generate_pdf_report(report: dict, filename: str):
     """Generate a PDF report using reportlab."""
     from reportlab.lib.pagesizes import letter
@@ -1750,7 +1627,7 @@ def _generate_pdf_report(report: dict, filename: str):
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#cccccc")))
     story.append(Spacer(1, 8))
 
-    # ---- NEW: Patient Information Block ----
+    #Patient Information Block
     user_id = session.get("user_id")
     if user_id:
         conn = sqlite3.connect(DB_PATH)
@@ -1782,7 +1659,6 @@ def _generate_pdf_report(report: dict, filename: str):
             ]))
             story.append(patient_table)
             story.append(Spacer(1, 14))
-    # ----------------------------------------
 
     # Summary info table
     story.append(Paragraph("Diagnosis Overview", heading_style))
@@ -1808,7 +1684,7 @@ def _generate_pdf_report(report: dict, filename: str):
     story.append(summary_table)
     story.append(Spacer(1, 14))
 
-    # ---- Farnsworth D-15 detail ----
+    #Farnsworth D-15 detail
     if kind == "d15":
         summary = report.get("summary", {})
         story.append(Paragraph("Score Summary", heading_style))
@@ -1866,7 +1742,7 @@ def _generate_pdf_report(report: dict, filename: str):
         ] + result_colors))
         story.append(q_table)
 
-    # ---- Ishihara detail ----
+    #Ishihara detail
     elif kind == "ishihara":
         details     = report.get("details", {})
         total_q     = details.get("total_questions", 0)
@@ -1932,7 +1808,7 @@ def _generate_pdf_report(report: dict, filename: str):
             ] + result_colors))
             story.append(a_table)
             
-    # ---- Mosaic detail ----
+    #Mosaic detail
     elif kind == "mosaic":
         summary = report.get("summary", {})
         story.append(Paragraph("Score Summary", heading_style))
@@ -1999,10 +1875,7 @@ def _generate_pdf_report(report: dict, filename: str):
         download_name=filename,
     )
 
-# ---------------------------------------------------------------------------
 # Entry point
-# ---------------------------------------------------------------------------
-
 @app.route("/test-email")
 def test_email():
     import smtplib
