@@ -471,14 +471,15 @@ const MOSAIC_DIGIT_MAPS = {
 };
 
 // ── Colour palettes ──────────────────────────────────────────────────────────
+// ── Clinical Colour Palettes ────────────────────────────────────────────────
 const MOSAIC_PALETTES = {
   rg: {
-    fg: ["#e74c3c","#c0392b","#e84393","#ff6b81","#ff4757","#c62828"],
-    bg: ["#27ae60","#2ecc71","#1abc9c","#00b894","#55efc4","#00cec9"],
+    fg: ["#e53935", "#f4511e", "#ef5350", "#d84315", "#ff5252"],
+    bg: ["#43a047", "#66bb6a", "#558b2f", "#4caf50", "#7cb342", "#81c784"],
   },
   by: {
-    fg: ["#2980b9","#3498db","#74b9ff","#0984e3","#6c5ce7","#4834d4"],
-    bg: ["#f1c40f","#f39c12","#fdcb6e","#e17055","#ffeaa7","#d4ac0d"],
+    fg: ["#1e88e5", "#3949ab", "#039be5", "#5e35b1", "#42a5f5"],
+    bg: ["#fdd835", "#c0ca33", "#ffeb3b", "#d4e157", "#fbc02d", "#afb42b"],
   },
 };
 
@@ -515,10 +516,7 @@ function drawMosaicPlate(canvas, digit, type) {
     for (let c = 0; c < COLS; c++) {
       const isFg = map[r * COLS + c] === 1;
       const pool = isFg ? palette.fg : palette.bg;
-      // ~10% noise on background tiles
-      const color = (!isFg && rng() < 0.10)
-        ? palette.fg[Math.floor(rng() * palette.fg.length)]
-        : pool[Math.floor(rng() * pool.length)];
+      const color = pool[Math.floor(rng() * pool.length)];
 
       const x = PAD + c * (tileW + GAP);
       const y = PAD + r * (tileH + GAP);

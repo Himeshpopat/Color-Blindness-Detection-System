@@ -779,20 +779,28 @@ def diagnose_mosaic_result(summary: dict) -> str:
     """Return a human readable diagnosis for the mosaic test."""
     total = summary["total"]
     correct = summary["correct"]
+    rg_total = summary.get("rg_total", 1)
+    by_total = summary.get("by_total", 1)
     rg_correct = summary["rg_correct"]
     by_correct = summary["by_correct"]
 
-    accuracy = correct / total if total else 0
-    rg_accuracy = rg_correct / summary["rg_total"] if summary["rg_total"] else 0
-    by_accuracy = by_correct / summary["by_total"] if summary["by_total"] else 0
+    # Calculate total mistakes
+    rg_misses = rg_total - rg_correct
+    by_misses = by_total - by_correct
+    total_misses = total - correct
 
-    if accuracy >= 0.8 and rg_accuracy >= 0.8 and by_accuracy >= 0.8:
+    # 1 mistake total is completely normal (accounts for a typo or screen glare)
+    if total_misses <= 1:
         return "Normal Color Vision"
-    if rg_accuracy < 0.7 and rg_accuracy <= by_accuracy:
+        
+    # If they missed 2 or more, evaluate where the mistakes happened
+    if rg_misses > by_misses:
         return "Possible Red-Green Deficiency"
-    if by_accuracy < 0.7 and by_accuracy < rg_accuracy:
+    elif by_misses > rg_misses:
         return "Possible Blue-Yellow Deficiency"
-    return "Borderline or Mild Color Vision Change"
+    else:
+        # Equal amount of mistakes in both categories
+        return "Borderline or Mild Color Vision Change"
 
 @app.route("/mosaic", methods=["GET"])
 def mosaic():
