@@ -1858,7 +1858,7 @@ def _generate_pdf_report(report: dict, filename: str):
         q_table = Table(q_data, colWidths=col_w)
         result_colors = [
             ("TEXTCOLOR", (2, i + 1), (2, i + 1),
-             colors.HexColor("#2e7d32") if row[2] == "0" else colors.HexColor("#c62828"))
+            colors.HexColor("#2e7d32") if row[2] == "0" else colors.HexColor("#c62828"))
             for i, row in enumerate(q_data[1:])
         ]
         q_table.setStyle(TableStyle([
@@ -1924,7 +1924,7 @@ def _generate_pdf_report(report: dict, filename: str):
             a_table = Table(a_data, colWidths=col_w)
             result_colors = [
                 ("TEXTCOLOR", (3, i + 1), (3, i + 1),
-                 colors.HexColor("#2e7d32") if row[3] == "Correct" else colors.HexColor("#c62828"))
+                colors.HexColor("#2e7d32") if row[3] == "Correct" else colors.HexColor("#c62828"))
                 for i, row in enumerate(a_data[1:])
             ]
             a_table.setStyle(TableStyle([
