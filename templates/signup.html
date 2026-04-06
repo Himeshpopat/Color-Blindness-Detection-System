@@ -197,30 +197,31 @@
                 <label>Full Name *</label>
                 <input type="text" id="s1_name" placeholder="John Doe" required>
             </div>
-                <div class="form-group">
-                    <label>Username *</label>
-                    <input type="text" id="s1_username" placeholder="johndoe123" required>
-                </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Age</label>
-                    <input type="number" id="s1_age" min="1" max="120" placeholder="25">
-                </div>
-                <div class="form-group">
-                    <label>Gender</label>
-                    <select id="s1_gender">
-                        <option value="">Select...</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                        <option value="Prefer not to say">Prefer not to say</option>
-                    </select>
-                </div>
+            
+            <div class="form-group">
+                <label>Username *</label>
+                <input type="text" id="s1_username" placeholder="johndoe123" required>
             </div>
 
             <div class="form-group">
                 <label>Email Address *</label>
                 <input type="email" id="s1_email" placeholder="john@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label>Age</label>
+                <input type="number" id="s1_age" min="1" max="120" placeholder="25" style="text-align: left;">
+            </div>
+            
+            <div class="form-group">
+                <label>Gender</label>
+                <select id="s1_gender">
+                    <option value="">Select...</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                </select>
             </div>
 
             <div id="step1Err" class="error-msg" style="display:none;"></div>

@@ -451,146 +451,186 @@ function drawD15Diagram(canvasId, userOrder) {
 
 
 // =============================================================================
-// =============================================================================
 // SECTION 3 — MOSAIC TEST (mosaic.html)
-// One plate at a time, Enter/Next to advance, canvas-rendered digits.
+//
+// Design: 6×6 grid of 36 coloured tiles arranged in 4 hidden colour groups.
+// The user taps a group label then taps tiles they think belong to that group.
+// After 3 rounds the grouping errors are analysed across protan / deutan /
+// tritan confusion axes — exactly analogous to the 1929 Mosaic Test and its
+// colour-vision adaptation.
+//
+// Each MOSAIC_DATA plate from Flask contains:
+//   id          – plate identifier
+//   type        – "rg" | "by" | "tritan" | "control"
+//   tiles       – array of 36 {color:"#rrggbb", true_group:0-3}  (shuffled)
+//   group_labels – array of 4 display names for the groups
+//   group_swatches – array of 4 representative hex colours for the buttons
 // =============================================================================
 
-// ── Digit pixel maps (6 cols × 8 rows) ──────────────────────────────────────
-const MOSAIC_DIGIT_MAPS = {
-  "0": [0,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
-  "1": [0,0,1,1,0,0, 0,1,1,1,0,0, 1,0,1,1,0,0, 0,0,1,1,0,0, 0,0,1,1,0,0, 0,0,1,1,0,0, 0,0,1,1,0,0, 1,1,1,1,1,1],
-  "2": [0,1,1,1,1,0, 1,1,0,0,1,1, 0,0,0,0,1,1, 0,0,0,1,1,0, 0,0,1,1,0,0, 0,1,1,0,0,0, 1,1,0,0,0,0, 1,1,1,1,1,1],
-  "3": [0,1,1,1,1,0, 1,1,0,0,1,1, 0,0,0,0,1,1, 0,0,1,1,1,0, 0,0,0,0,1,1, 0,0,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
-  "4": [0,0,0,1,1,0, 0,0,1,1,1,0, 0,1,0,1,1,0, 1,0,0,1,1,0, 1,1,1,1,1,1, 0,0,0,1,1,0, 0,0,0,1,1,0, 0,0,0,1,1,0],
-  "5": [1,1,1,1,1,1, 1,1,0,0,0,0, 1,1,0,0,0,0, 1,1,1,1,1,0, 0,0,0,0,1,1, 0,0,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
-  "6": [0,1,1,1,1,0, 1,1,0,0,0,0, 1,1,0,0,0,0, 1,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
-  "7": [1,1,1,1,1,1, 0,0,0,0,1,1, 0,0,0,1,1,0, 0,0,0,1,1,0, 0,0,1,1,0,0, 0,0,1,1,0,0, 0,1,1,0,0,0, 0,1,1,0,0,0],
-  "8": [0,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
-  "9": [0,1,1,1,1,0, 1,1,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,1, 0,0,0,0,1,1, 0,0,0,0,1,1, 1,1,0,0,1,1, 0,1,1,1,1,0],
-};
+let mosaicIndex     = 0;
+let mosaicAnswers   = [];
+let mosaicActiveGrp = null;        // which group button is currently active
+let mosaicTileState = [];          // assigned group index per tile (-1 = unassigned)
 
-// ── Colour palettes ──────────────────────────────────────────────────────────
-const MOSAIC_PALETTES = {
-  rg: {
-    fg: ["#e74c3c","#c0392b","#e84393","#ff6b81","#ff4757","#c62828"],
-    bg: ["#27ae60","#2ecc71","#1abc9c","#00b894","#55efc4","#00cec9"],
-  },
-  by: {
-    fg: ["#2980b9","#3498db","#74b9ff","#0984e3","#6c5ce7","#4834d4"],
-    bg: ["#f1c40f","#f39c12","#fdcb6e","#e17055","#ffeaa7","#d4ac0d"],
-  },
-};
+// ---------------------------------------------------------------------------
+// mosaicLoadPlate — render a plate's 6×6 board and group buttons.
+// ---------------------------------------------------------------------------
+function mosaicLoadPlate(idx) {
+    if (!MOSAIC_DATA || idx >= MOSAIC_DATA.length) return;
+    const plate = MOSAIC_DATA[idx];
 
-// ── Seeded RNG (mulberry32) — same plate looks the same on every load ────────
-function mosaicRNG(seed) {
-  let s = seed >>> 0;
-  return function () {
-    s |= 0; s = s + 0x6D2B79F5 | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+    mosaicActiveGrp = null;
+    mosaicTileState = new Array(36).fill(-1);
+
+    // ── Progress ──────────────────────────────────────────────────────────
+    const qc = document.getElementById("questionCount");
+    if (qc) qc.innerText = `Round ${idx + 1} of ${MOSAIC_DATA.length}`;
+    const pb = document.getElementById("progressBar");
+    if (pb) pb.style.width = (idx / MOSAIC_DATA.length * 100) + "%";
+
+    // ── Build board ───────────────────────────────────────────────────────
+    const board = document.getElementById("mosaicBoard");
+    board.innerHTML = "";
+    plate.tiles.forEach(function(tile, i) {
+        const div = document.createElement("div");
+        div.className = "m-tile";
+        div.style.background = tile.color;
+        div.dataset.idx = i;
+        div.addEventListener("click", function() { mosaicTileTap(i); });
+        board.appendChild(div);
+    });
+
+    // ── Build group buttons ───────────────────────────────────────────────
+    const row = document.getElementById("groupRow");
+    row.innerHTML = "";
+    plate.group_labels.forEach(function(label, gi) {
+        const btn = document.createElement("button");
+        btn.className = "group-btn";
+        btn.dataset.gi = gi;
+        btn.innerHTML =
+            `<span class="swatch" style="background:${plate.group_swatches[gi]}"></span>` +
+            `${label} <span class="g-count" id="gc-${gi}">0</span>`;
+        btn.addEventListener("click", function() { mosaicSelectGroup(gi); });
+        row.appendChild(btn);
+    });
 }
 
-// ── Draw one mosaic plate onto a canvas ──────────────────────────────────────
-function drawMosaicPlate(canvas, digit, type) {
-  const ctx  = canvas.getContext("2d");
-  const W    = canvas.width;
-  const H    = canvas.height;
-  const COLS = 6, ROWS = 8, PAD = 8, GAP = 3;
-  const tileW = (W - PAD * 2 - GAP * (COLS - 1)) / COLS;
-  const tileH = (H - PAD * 2 - GAP * (ROWS - 1)) / ROWS;
-  const radius = Math.min(tileW, tileH) * 0.28;
+// ---------------------------------------------------------------------------
+// mosaicSelectGroup — activate / deactivate a group button.
+// ---------------------------------------------------------------------------
+function mosaicSelectGroup(gi) {
+    mosaicActiveGrp = (mosaicActiveGrp === gi) ? null : gi;
+    document.querySelectorAll(".group-btn").forEach(function(btn) {
+        btn.classList.toggle("active-group", parseInt(btn.dataset.gi) === mosaicActiveGrp);
+    });
+}
 
-  const palette = MOSAIC_PALETTES[type] || MOSAIC_PALETTES.rg;
-  const map     = MOSAIC_DIGIT_MAPS[String(digit)];
-  if (!map) return;
-
-  const rng = mosaicRNG((digit.charCodeAt ? digit.charCodeAt(0) : parseInt(digit)) * 137 + (type === "by" ? 9999 : 0));
-
-  ctx.clearRect(0, 0, W, H);
-
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const isFg = map[r * COLS + c] === 1;
-      const pool = isFg ? palette.fg : palette.bg;
-      // ~10% noise on background tiles
-      const color = (!isFg && rng() < 0.10)
-        ? palette.fg[Math.floor(rng() * palette.fg.length)]
-        : pool[Math.floor(rng() * pool.length)];
-
-      const x = PAD + c * (tileW + GAP);
-      const y = PAD + r * (tileH + GAP);
-
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.roundRect(x, y, tileW, tileH, radius);
-      ctx.fill();
+// ---------------------------------------------------------------------------
+// mosaicTileTap — assign the active group to the tapped tile (or deassign).
+// ---------------------------------------------------------------------------
+function mosaicTileTap(idx) {
+    if (mosaicActiveGrp === null) {
+        // No group selected — if this tile is already grouped, deassign it
+        if (mosaicTileState[idx] !== -1) {
+            const oldGrp = mosaicTileState[idx];
+            mosaicTileState[idx] = -1;
+            mosaicRefreshTile(idx);
+            mosaicUpdateCount(oldGrp);
+        }
+        return;
     }
-  }
+
+    const prev = mosaicTileState[idx];
+    mosaicTileState[idx] = mosaicActiveGrp;
+    mosaicRefreshTile(idx);
+
+    if (prev !== -1 && prev !== mosaicActiveGrp) {
+        mosaicUpdateCount(prev);
+    }
+    mosaicUpdateCount(mosaicActiveGrp);
 }
 
-// ── State ────────────────────────────────────────────────────────────────────
-let mosaicCurrent = 0;
-let mosaicAnswers = [];   // [{id, correct_answer, user_answer, type, label, description}]
-
-// ── Load a mosaic plate by index ─────────────────────────────────────────────
-function mosaicLoadPlate(index) {
-  const q      = MOSAIC_DATA[index];
-  const canvas = document.getElementById("mosaicCanvas");
-  
-  if (canvas) {
-    // Smooth fade transition between plates
-    canvas.style.opacity = 0;
-    setTimeout(() => {
-      drawMosaicPlate(canvas, q.correct_answer, q.type);
-      canvas.style.opacity = 1;
-    }, 150);
-  }
-
-  const qc = document.getElementById("questionCount");
-  if (qc) qc.innerText = "Question " + (index + 1) + " of " + MOSAIC_DATA.length;
-
-  const pb = document.getElementById("progressBar");
-  if (pb) pb.style.width = (index / MOSAIC_DATA.length * 100) + "%";
+// ---------------------------------------------------------------------------
+// mosaicRefreshTile — sync one tile's CSS to its current state.
+// ---------------------------------------------------------------------------
+function mosaicRefreshTile(idx) {
+    const tiles = document.querySelectorAll(".m-tile");
+    const tile  = tiles[idx];
+    if (!tile) return;
+    // Remove all group classes
+    for (let g = 0; g < 4; g++) tile.classList.remove("grouped-" + g);
+    tile.classList.remove("selected");
+    const grp = mosaicTileState[idx];
+    if (grp !== -1) {
+        tile.classList.add("grouped-" + grp);
+    }
+    // Highlight if the active group matches this tile
+    if (mosaicActiveGrp !== null && mosaicTileState[idx] === mosaicActiveGrp) {
+        tile.classList.add("selected");
+    }
 }
 
-// ── Numpad button handler ─────────────────────────────────────────
-function mosaicNext(userAnswer) {
-  if (userAnswer === undefined) return;
-
-  const q = MOSAIC_DATA[mosaicCurrent];
-  
-  // Save the answer to our running list
-  mosaicAnswers.push({
-    id:             q.id,
-    correct_answer: q.correct_answer,
-    user_answer:    userAnswer,
-    type:           q.type,
-    label:          q.label,
-    description:    q.description,
-  });
-
-  mosaicCurrent++;
-
-  if (mosaicCurrent < MOSAIC_DATA.length) {
-    mosaicLoadPlate(mosaicCurrent); // load next plate
-  } else {
-    mosaicFinish(); // End of test
-  }
+// ---------------------------------------------------------------------------
+// mosaicUpdateCount — refresh the tile-count badge on a group button.
+// ---------------------------------------------------------------------------
+function mosaicUpdateCount(gi) {
+    const badge = document.getElementById("gc-" + gi);
+    if (!badge) return;
+    badge.textContent = mosaicTileState.filter(function(g) { return g === gi; }).length;
 }
 
-// ── Submit to Flask ──────────────────────────────────────────────────────────
-function mosaicFinish() {
-  const field = document.getElementById("mosaicAnswersField");
-  const form  = document.getElementById("mosaicForm");
-  if (field && form) {
-    field.value = JSON.stringify(mosaicAnswers);
-    form.submit();
-  }
+// ---------------------------------------------------------------------------
+// mosaicReset — clear all tile assignments for the current round.
+// ---------------------------------------------------------------------------
+function mosaicReset() {
+    mosaicActiveGrp = null;
+    mosaicTileState = new Array(36).fill(-1);
+    document.querySelectorAll(".m-tile").forEach(function(tile) {
+        tile.className = "m-tile";
+    });
+    document.querySelectorAll(".group-btn").forEach(function(btn) {
+        btn.classList.remove("active-group");
+    });
+    for (let g = 0; g < 4; g++) {
+        const badge = document.getElementById("gc-" + g);
+        if (badge) badge.textContent = "0";
+    }
 }
 
+// ---------------------------------------------------------------------------
+// mosaicSubmitRound — record this round's grouping and move on.
+// ---------------------------------------------------------------------------
+function mosaicSubmitRound() {
+    const plate = MOSAIC_DATA[mosaicIndex];
+
+    // Build per-tile record: {tile_idx, true_group, assigned_group}
+    const tileRecords = plate.tiles.map(function(tile, i) {
+        return {
+            tile_idx:       i,
+            color:          tile.color,
+            true_group:     tile.true_group,
+            assigned_group: mosaicTileState[i]   // -1 = not grouped
+        };
+    });
+
+    mosaicAnswers.push({
+        id:       plate.id,
+        type:     plate.type,
+        tiles:    tileRecords
+    });
+
+    mosaicIndex++;
+
+    if (mosaicIndex >= MOSAIC_DATA.length) {
+        const pb = document.getElementById("progressBar");
+        if (pb) pb.style.width = "100%";
+        document.getElementById("mosaicAnswersField").value = JSON.stringify(mosaicAnswers);
+        document.getElementById("mosaicForm").submit();
+        return;
+    }
+
+    mosaicLoadPlate(mosaicIndex);
+}
 
 // =============================================================================
 // SHARED UTILITY — B/W Mode toggle (used by all pages)

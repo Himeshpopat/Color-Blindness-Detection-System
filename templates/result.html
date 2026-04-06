@@ -125,32 +125,59 @@
 
         <div class="mosaic-summary-grid">
             <div class="mosaic-stat">
-                <h2>{{ s.correct }} / {{ s.total }}</h2>
-                <p>Overall Score</p>
+                <h2>{{ s.total_correct if s.total_correct is defined else s.correct }} / {{ s.total_tiles if s.total_tiles is defined else s.total }}</h2>
+                <p>Tiles Correctly Grouped</p>
             </div>
             <div class="mosaic-stat">
                 <h2>{{ s.rg_correct }} / {{ s.rg_total }}</h2>
-                <p>Red-Green Plates</p>
+                <p>Red-Green Plate</p>
             </div>
             <div class="mosaic-stat">
                 <h2>{{ s.by_correct }} / {{ s.by_total }}</h2>
-                <p>Blue-Yellow Plates</p>
+                <p>Blue-Yellow Plate</p>
             </div>
         </div>
 
+        {% if s.total_rg_errors is defined %}
+        <div class="mosaic-summary-grid" style="margin-top:-10px;">
+            <div class="mosaic-stat">
+                <h2 style="color:#ff8a80;">{{ s.total_rg_errors }}</h2>
+                <p>Red-Green Confusions</p>
+            </div>
+            <div class="mosaic-stat">
+                <h2 style="color:#ff8a80;">{{ s.total_tritan_errors }}</h2>
+                <p>Blue-Yellow Confusions</p>
+            </div>
+            <div class="mosaic-stat">
+                <h2>{{ "%.0f"|format(s.control_accuracy * 100) }}%</h2>
+                <p>Control Accuracy</p>
+            </div>
+        </div>
+        {% endif %}
+
         {% if report.details %}
-        <h3>Answer Breakdown</h3>
+        <h3>Round Breakdown</h3>
         <table class="answer-table">
             <thead>
-                <tr><th>Question</th><th>Your Answer</th><th>Correct Answer</th><th>Result</th></tr>
+                <tr>
+                    <th>Round</th>
+                    <th>Plate Type</th>
+                    <th>Tiles Correct</th>
+                    <th>RG Errors</th>
+                    <th>BY Errors</th>
+                    <th>Unassigned</th>
+                </tr>
             </thead>
             <tbody>
                 {% for a in report.details %}
+                {% set round_total = (a.total_assigned + a.unassigned) if (a.total_assigned is defined and a.unassigned is defined) else 36 %}
                 <tr>
-                    <td>{{ a.label }}</td>
-                    <td>{{ a.user_answer }}</td>
-                    <td>{{ a.correct_answer }}</td>
-                    <td style="color:{{ '#a5d6a7' if a.is_correct else '#ff8a80' }};">{{ 'Correct' if a.is_correct else 'Incorrect' }}</td>
+                    <td>Round {{ a.id }}</td>
+                    <td>{{ a.label if a.label is defined else a.type }}</td>
+                    <td style="color:{{ '#a5d6a7' if a.is_correct else '#ff8a80' }};">{{ a.correct }} / {{ round_total }}</td>
+                    <td style="color:{{ '#ff8a80' if a.rg_errors > 0 else 'inherit' }};">{{ a.rg_errors if a.rg_errors is defined else 0 }}</td>
+                    <td style="color:{{ '#ff8a80' if a.tritan_errors > 0 else 'inherit' }};">{{ a.tritan_errors if a.tritan_errors is defined else 0 }}</td>
+                    <td style="opacity:0.7;">{{ a.unassigned if a.unassigned is defined else 0 }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -98,6 +98,11 @@ def save_test_result(test_type: str, score: int, total: int, diagnosis: str, ans
     conn.close()
     return row_id
 
+# Session helpers
+def store_report(report: dict) -> None:
+    """Store the latest report in the session so result.html can display it."""
+    session["last_report"] = report
+
 def get_all_test_results(user_id):
     """Fetch all test results from the database."""
     # If there is no user_id (user not logged in), return an empty list immediately
@@ -650,142 +655,329 @@ def diagnose_d15(summary: dict) -> str:
 
     return "Mild Color Vision Anomaly — axis unclear; clinical testing recommended"
 
-# ---- Mosaic (Digit) test configuration ----
+# ---- Mosaic Color Test configuration ----
+#
+# The Mosaic Test presents a 6×6 grid of 36 coloured tiles spread across
+# 4 hidden colour groups.  The user taps tiles to assign them to labelled
+# groups.  Their grouping errors are scored against three colour-confusion
+# axes (Protan, Deutan, Tritan) to detect and classify colour vision
+# deficiency — consistent with the 1929 Mosaic Test paradigm adapted for CVD.
+#
+# Each plate dict is sent to the browser as JSON and contains:
+#   id            – plate number
+#   type          – "rg" (red-green), "by" (blue-yellow), "tritan", "control"
+#   tiles         – list of 36 {color, true_group} dicts (shuffled before send)
+#   group_labels  – 4 display names ("Group A" … "Group D")
+#   group_swatches – 4 representative hex values for the group selector buttons
+#
+# Tile colours within each group vary in lightness/saturation so that
+# normal observers group them easily by hue, while colour-deficient observers
+# conflate specific pairs of groups along their confusion axis.
+#
+# Confusion pairs:
+#   Protan  — Red ↔ Green  (groups 0 ↔ 1 on rg plates)
+#   Deutan  — Red ↔ Green  (groups 0 ↔ 1 on rg plates, different primaries)
+#   Tritan  — Blue ↔ Yellow (groups 0 ↔ 1 on by plates)
+#
+# Each plate is defined as a list of (hue_hex, lightness_variants) tuples;
+# the builder function expands them to 9 tiles per group.
 
-# Each mosaic plate visually encodes a single digit (0–9) using
-# a 6x6 grid and two color groups (foreground vs background).
+def _build_tiles(group_colors):
+    """
+    group_colors: list of 4 lists, each containing 9 hex strings.
+    Returns a flat list of 36 {color, true_group} dicts.
+    """
+    tiles = []
+    for gi, colors in enumerate(group_colors):
+        for hex_color in colors:
+            tiles.append({"color": hex_color, "true_group": gi})
+    return tiles
 
-MOSAIC_QUESTIONS = [
+
+# Red-Green plate — Protan/Deutan confusion axis
+# Groups 0 (reds) and 1 (greens) are confused by red-green deficients.
+# Groups 2 (blues) and 3 (purples) are control groups.
+_RG_PLATE_GROUPS = [
+    # Group 0: Reds / oranges
+    ["#c0392b","#e74c3c","#e55039","#d32f2f","#f44336",
+     "#b71c1c","#ef9a9a","#ef5350","#c62828"],
+    # Group 1: Greens
+    ["#27ae60","#2ecc71","#43a047","#388e3c","#66bb6a",
+     "#1b5e20","#a5d6a7","#4caf50","#2e7d32"],
+    # Group 2: Blues (control — easy for everyone)
+    ["#1565c0","#1976d2","#1e88e5","#2196f3","#42a5f5",
+     "#0d47a1","#90caf9","#64b5f6","#1565c0"],
+    # Group 3: Purples (control)
+    ["#6a1b9a","#7b1fa2","#8e24aa","#9c27b0","#ab47bc",
+     "#4a148c","#ce93d8","#ba68c8","#7b1fa2"],
+]
+
+# Blue-Yellow plate — Tritan confusion axis
+# Groups 0 (blues) and 1 (yellows) are confused by tritan deficients.
+# Groups 2 (reds) and 3 (greens) are control groups.
+_BY_PLATE_GROUPS = [
+    # Group 0: Blues
+    ["#1565c0","#1976d2","#1e88e5","#2196f3","#42a5f5",
+     "#0d47a1","#90caf9","#64b5f6","#1565c0"],
+    # Group 1: Yellows / ambers
+    ["#f9a825","#f57f17","#ffb300","#ffa000","#ff8f00",
+     "#e65100","#ffe082","#ffca28","#ff8f00"],
+    # Group 2: Reds (control)
+    ["#c0392b","#e74c3c","#e55039","#d32f2f","#f44336",
+     "#b71c1c","#ef9a9a","#ef5350","#c62828"],
+    # Group 3: Greens (control)
+    ["#27ae60","#2ecc71","#43a047","#388e3c","#66bb6a",
+     "#1b5e20","#a5d6a7","#4caf50","#2e7d32"],
+]
+
+# Control plate — four clearly distinct hue groups; EVERYONE should group
+# these correctly. Used to verify the user understands the task.
+_CONTROL_PLATE_GROUPS = [
+    # Group 0: Reds
+    ["#c0392b","#e74c3c","#e55039","#d32f2f","#f44336",
+     "#b71c1c","#ef9a9a","#ef5350","#c62828"],
+    # Group 1: Blues
+    ["#1565c0","#1976d2","#1e88e5","#2196f3","#42a5f5",
+     "#0d47a1","#90caf9","#64b5f6","#1565c0"],
+    # Group 2: Greens
+    ["#27ae60","#2ecc71","#43a047","#388e3c","#66bb6a",
+     "#1b5e20","#a5d6a7","#4caf50","#2e7d32"],
+    # Group 3: Yellows
+    ["#f9a825","#f57f17","#ffb300","#ffa000","#ff8f00",
+     "#e65100","#ffe082","#ffca28","#ff8f00"],
+]
+
+MOSAIC_PLATES = [
     {
         "id": 1,
-        "label": "Mosaic Plate 1",
-        "description": "Red–green mosaic forming the digit 3.",
-        "correct_answer": "3",
-        "type": "rg",  # red‑green oriented
+        "type": "control",
+        "tiles": _build_tiles(_CONTROL_PLATE_GROUPS),
+        "group_labels":   ["Group A", "Group B", "Group C", "Group D"],
+        "group_swatches": ["#e74c3c", "#2196f3", "#2ecc71", "#ffb300"],
     },
     {
         "id": 2,
-        "label": "Mosaic Plate 2",
-        "description": "Red–green mosaic forming the digit 5.",
-        "correct_answer": "5",
         "type": "rg",
+        "tiles": _build_tiles(_RG_PLATE_GROUPS),
+        "group_labels":   ["Group A", "Group B", "Group C", "Group D"],
+        "group_swatches": ["#e74c3c", "#2ecc71", "#2196f3", "#9c27b0"],
     },
     {
         "id": 3,
-        "label": "Mosaic Plate 3",
-        "description": "Blue–yellow mosaic forming the digit 8.",
-        "correct_answer": "8",
-        "type": "by",  # blue‑yellow oriented
-    },
-    {
-        "id": 4,
-        "label": "Mosaic Plate 4",
-        "description": "Red–green mosaic forming the digit 2.",
-        "correct_answer": "2",
-        "type": "rg",
-    },
-    {
-        "id": 5,
-        "label": "Mosaic Plate 5",
-        "description": "Blue–yellow mosaic forming the digit 9.",
-        "correct_answer": "9",
         "type": "by",
+        "tiles": _build_tiles(_BY_PLATE_GROUPS),
+        "group_labels":   ["Group A", "Group B", "Group C", "Group D"],
+        "group_swatches": ["#2196f3", "#ffb300", "#e74c3c", "#2ecc71"],
     },
 ]
 
 
-def diagnose_mosaic_result(summary: dict) -> str:
-    """Return a human readable diagnosis for the mosaic test."""
-    total = summary["total"]
-    correct = summary["correct"]
-    rg_correct = summary["rg_correct"]
-    by_correct = summary["by_correct"]
+# ---------------------------------------------------------------------------
+# Mosaic scoring helpers
+# ---------------------------------------------------------------------------
 
-    accuracy = correct / total if total else 0
-    rg_accuracy = rg_correct / summary["rg_total"] if summary["rg_total"] else 0
-    by_accuracy = by_correct / summary["by_total"] if summary["by_total"] else 0
+def _score_mosaic_plate(plate: dict, tile_records: list) -> dict:
+    """
+    Score one plate.
 
-    if accuracy >= 0.8 and rg_accuracy >= 0.8 and by_accuracy >= 0.8:
-        return "Normal Color Vision"
-    if rg_accuracy < 0.7 and rg_accuracy <= by_accuracy:
-        return "Possible Red-Green Deficiency"
-    if by_accuracy < 0.7 and by_accuracy < rg_accuracy:
-        return "Possible Blue-Yellow Deficiency"
-    return "Borderline or Mild Color Vision Change"
+    For each tile that was assigned, check whether it went to the correct
+    true_group (correct) or to a different group (error).
+
+    Confusion errors:
+      rg plate:  true_group 0 assigned to group 1, or vice versa  → RG error
+      by plate:  true_group 0 assigned to group 1, or vice versa  → Tritan error
+
+    Returns:
+      correct          – count of tiles assigned to their true group
+      total_assigned   – tiles the user assigned (possibly < 36)
+      rg_errors        – red-green confusion count
+      tritan_errors    – blue-yellow confusion count
+      unassigned       – tiles left ungrouped (-1)
+    """
+    correct = 0
+    rg_errors = 0
+    tritan_errors = 0
+    unassigned = 0
+    total_assigned = 0
+
+    for rec in tile_records:
+        tg = rec.get("true_group", -1)
+        ag = rec.get("assigned_group", -1)
+
+        if ag == -1:
+            unassigned += 1
+            continue
+
+        total_assigned += 1
+
+        if ag == tg:
+            correct += 1
+        else:
+            ptype = plate.get("type", "control")
+            # RG confusion: groups 0 and 1 swapped on an rg plate
+            if ptype == "rg" and {tg, ag} == {0, 1}:
+                rg_errors += 1
+            # Tritan confusion: groups 0 and 1 swapped on a by plate
+            elif ptype == "by" and {tg, ag} == {0, 1}:
+                tritan_errors += 1
+
+    return {
+        "correct": correct,
+        "total_assigned": total_assigned,
+        "rg_errors": rg_errors,
+        "tritan_errors": tritan_errors,
+        "unassigned": unassigned,
+    }
+
+
+def diagnose_mosaic(summary: dict) -> str:
+    """
+    Produce a diagnosis string from aggregated mosaic scores.
+    """
+    ctrl_acc = summary.get("control_accuracy", 1.0)
+
+    # If the user couldn't group even the control plate, the test is inconclusive
+    if ctrl_acc < 0.5:
+        return "Test Inconclusive (user may not have understood the task)"
+
+    rg_err     = summary.get("total_rg_errors", 0)
+    trit_err   = summary.get("total_tritan_errors", 0)
+    total_tiles = summary.get("total_tiles", 1)
+
+    rg_rate   = rg_err   / total_tiles
+    trit_rate = trit_err / total_tiles
+
+    # Both axes significant
+    if rg_rate >= 0.20 and trit_rate >= 0.20:
+        return "General Color Vision Deficiency (multiple axes affected)"
+
+    # Red-green dominant
+    if rg_rate >= 0.25:
+        return "Significant Red-Green Color Vision Deficiency (Protan or Deutan)"
+    if rg_rate >= 0.12:
+        return "Mild Red-Green Color Vision Deficiency"
+
+    # Tritan dominant
+    if trit_rate >= 0.25:
+        return "Significant Blue-Yellow Color Vision Deficiency (Tritanopia/Tritanomaly)"
+    if trit_rate >= 0.12:
+        return "Mild Blue-Yellow Color Vision Deficiency"
+
+    # All good
+    return "Normal Color Vision"
+
 
 @app.route("/mosaic", methods=["GET"])
 def mosaic():
-    # 1. Create a copy of the mosaic questions so we don't alter the master list
-    shuffled_questions = list(MOSAIC_QUESTIONS)
-    
-    # 2. Shuffle the copied list randomly
-    random.shuffle(shuffled_questions)
-    
-    # 3. Pass the shuffled list to the template
+    import copy
+    plates = copy.deepcopy(MOSAIC_PLATES)
+    for plate in plates:
+        random.shuffle(plate["tiles"])   # randomise tile positions each session
+    random.shuffle(plates)               # randomise plate order
     return render_template(
-        "mosaic.html", 
-        questions_json=json.dumps(shuffled_questions),
-        total_questions=len(shuffled_questions)
+        "mosaic.html",
+        questions_json=json.dumps(plates),
+        total_questions=len(plates),
     )
-    
+
+
 @app.route("/submit-mosaic", methods=["POST"])
 def submit_mosaic():
-    # Retrieve the JSON string generated by the Javascript numpad
-    raw_answers = request.form.get("mosaicAnswersJson", "[]")
+    raw = request.form.get("mosaicAnswersJson", "[]")
     try:
-        answers_list = json.loads(raw_answers)
+        rounds = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
-        answers_list = []
+        rounds = []
 
-    # Map answers to a dictionary for easy grading {id: "user_answer"}
-    user_answers_dict = {ans.get("id"): str(ans.get("user_answer", "")) for ans in answers_list}
+    # Build a lookup from plate id → plate definition
+    plate_lookup = {p["id"]: p for p in MOSAIC_PLATES}
 
-    details = []
-    correct_count = 0
-    rg_correct = 0
-    by_correct = 0
-    rg_total = sum(1 for q in MOSAIC_QUESTIONS if q["type"] == "rg")
-    by_total = sum(1 for q in MOSAIC_QUESTIONS if q["type"] == "by")
+    details = []          # per-round breakdown shown in result.html & PDF
+    total_rg_errors     = 0
+    total_tritan_errors = 0
+    total_correct       = 0
+    total_tiles         = 0
+    rg_correct          = 0
+    rg_total            = 0
+    by_correct          = 0
+    by_total            = 0
+    control_correct     = 0
+    control_tiles       = 0
 
-    for q in MOSAIC_QUESTIONS:
-        user_answer = user_answers_dict.get(q["id"], "")
-        is_correct = user_answer == q["correct_answer"]
-        
-        if is_correct:
-            correct_count += 1
-            if q["type"] == "rg":
-                rg_correct += 1
-            else:
-                by_correct += 1
+    for rnd in rounds:
+        pid          = rnd.get("id")
+        ptype        = rnd.get("type", "")
+        plate        = plate_lookup.get(pid, {"type": ptype, "id": pid})
+        tile_records = rnd.get("tiles", [])
 
-        details.append(
-            {
-                "id": q["id"],
-                "label": q["label"],
-                "description": q["description"],
-                "correct_answer": q["correct_answer"],
-                "user_answer": user_answer or "No answer",
-                "is_correct": is_correct,
-                "type": q["type"],
-            }
-        )
+        sc = _score_mosaic_plate(plate, tile_records)
 
+        round_tiles   = sc["total_assigned"] + sc["unassigned"]
+        total_correct       += sc["correct"]
+        total_rg_errors     += sc["rg_errors"]
+        total_tritan_errors += sc["tritan_errors"]
+        total_tiles         += round_tiles
+
+        # Accumulate per-axis totals for result.html compatibility
+        if ptype == "rg":
+            rg_correct += sc["correct"]
+            rg_total   += round_tiles
+        elif ptype == "by":
+            by_correct += sc["correct"]
+            by_total   += round_tiles
+        elif ptype == "control":
+            control_correct += sc["correct"]
+            control_tiles   += round_tiles
+
+        type_label = {
+            "rg":      "Red-Green Plate",
+            "by":      "Blue-Yellow Plate",
+            "control": "Control Plate",
+        }.get(ptype, ptype.title())
+
+        details.append({
+            "id":             pid,
+            "type":           ptype,
+            "label":          type_label,
+            "correct":        sc["correct"],
+            "total_assigned": sc["total_assigned"],
+            "rg_errors":      sc["rg_errors"],
+            "tritan_errors":  sc["tritan_errors"],
+            "unassigned":     sc["unassigned"],
+            # Fields used by result.html answer table
+            "is_correct":     sc["correct"] >= (round_tiles * 0.75),
+            "user_answer":    f"{sc['correct']} / {round_tiles} tiles correct",
+            "correct_answer": "All tiles correctly grouped",
+        })
+
+    ctrl_acc = (control_correct / control_tiles) if control_tiles else 1.0
+
+    # Summary dict — keys match BOTH the old digit-test template fields
+    # (s.correct, s.total, s.rg_correct …) AND the new mosaic-specific fields.
     summary = {
-        "correct": correct_count,
-        "total": len(MOSAIC_QUESTIONS),
-        "rg_correct": rg_correct,
-        "by_correct": by_correct,
-        "rg_total": rg_total,
-        "by_total": by_total,
+        # New mosaic fields
+        "total_tiles":           total_tiles,
+        "total_correct":         total_correct,
+        "total_rg_errors":       total_rg_errors,
+        "total_tritan_errors":   total_tritan_errors,
+        "control_accuracy":      round(ctrl_acc, 3),
+        "rounds":                len(rounds),
+        # Alias fields so result.html {# mosaic #} block renders without change
+        "correct":               total_correct,
+        "total":                 total_tiles,
+        "rg_correct":            rg_correct,
+        "rg_total":              rg_total,
+        "by_correct":            by_correct,
+        "by_total":              by_total,
     }
 
-    diagnosis = diagnose_mosaic_result(summary)
+    diagnosis = diagnose_mosaic(summary)
 
     report = {
-        "test_name": "Mosaic Color Blindness Test",
-        "kind": "mosaic",
-        "details": details,
-        "summary": summary,
+        "test_name": "Mosaic Color Test",
+        "kind":      "mosaic",
+        "details":   details,
+        "summary":   summary,
         "diagnosis": diagnosis,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
@@ -793,83 +985,13 @@ def submit_mosaic():
     store_report(report)
     save_test_result(
         test_type="mosaic",
-        score=correct_count,
-        total=len(MOSAIC_QUESTIONS),
+        score=total_correct,
+        total=total_tiles if total_tiles > 0 else 1,
         diagnosis=diagnosis,
         answers_json=json.dumps(details),
         report_data=report,
     )
     return redirect(url_for("result"))
-
-# Session helpers
-def store_report(report: dict) -> None:
-    """Store the latest report in the session."""
-    session["last_report"] = report
-
-
-# Auth routes
-# OTP helpers
-
-def _send_otp_email(to_email: str, otp_code: str) -> tuple[bool, str]:
-    """
-    Send a 6-digit OTP via Gmail SMTP (port 587 + STARTTLS).
-    Returns (True, "") on success or (False, error_message) on failure.
-
-    Requirements:
-      - 2-Step Verification must be ON for societysync@gmail.com
-      - OTP_SENDER_PASSWORD must be a Gmail App Password (16 chars, no spaces)
-      - "Less secure app access" is NOT needed — App Passwords bypass that
-    """
-    if OTP_SENDER_PASSWORD == "YOUR_GMAIL_APP_PASSWORD":
-        return False, "OTP_SENDER_PASSWORD not configured in app.py."
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Your Color Vision Detector verification code"
-        msg["From"]    = OTP_SENDER_EMAIL
-        msg["To"]      = to_email
-
-        body_text = (
-            f"Your verification code is: {otp_code}\n\n"
-            f"It expires in {OTP_EXPIRY_MINUTES} minutes.\n"
-            f"If you did not request this, ignore this email."
-        )
-        body_html = f"""<div style="font-family:sans-serif;max-width:420px;margin:auto;
-                padding:30px;background:#1a1a2e;border-radius:16px;color:#eee;">
-            <h2 style="color:#ffc83c;margin-bottom:8px;">Color Vision Detector</h2>
-            <p style="color:#aaa;margin-bottom:24px;">Your email verification code:</p>
-            <div style="font-size:36px;font-weight:700;letter-spacing:10px;text-align:center;
-                        background:rgba(255,255,255,0.07);border-radius:12px;padding:18px;color:#fff;">
-                {otp_code}
-            </div>
-            <p style="color:#888;font-size:13px;margin-top:20px;">
-                Expires in {OTP_EXPIRY_MINUTES} minutes.
-                If you didn't request this, ignore this email.
-            </p>
-        </div>"""
-
-        msg.attach(MIMEText(body_text, "plain"))
-        msg.attach(MIMEText(body_html,  "html"))
-
-        # Port 587 + STARTTLS is the standard Gmail approach
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(OTP_SENDER_EMAIL, OTP_SENDER_PASSWORD)
-            server.sendmail(OTP_SENDER_EMAIL, to_email, msg.as_string())
-
-        return True, ""
-
-    except smtplib.SMTPAuthenticationError:
-        return False, ("Gmail authentication failed. Make sure you are using a Gmail "
-                       "App Password (not your regular password). Go to "
-                       "myaccount.google.com → Security → App Passwords to generate one.")
-    except smtplib.SMTPException as e:
-        return False, f"SMTP error: {e}"
-    except Exception as e:
-        return False, f"Unexpected error: {e}"
-
 
 @app.route("/send-otp", methods=["POST"])
 def send_otp():
@@ -1469,19 +1591,30 @@ def report_detail(report_id):
                     details_list = json.loads(row["answers_json"])
                 except (json.JSONDecodeError, TypeError):
                     pass
-            rg_total   = sum(1 for a in details_list if a.get("type") == "rg")
-            by_total   = sum(1 for a in details_list if a.get("type") == "by")
-            rg_correct = sum(1 for a in details_list if a.get("type") == "rg" and a.get("is_correct"))
-            by_correct = sum(1 for a in details_list if a.get("type") == "by" and a.get("is_correct"))
-            correct    = sum(1 for a in details_list if a.get("is_correct"))
-            total      = len(details_list) or row["total_questions"]
+            rg_rounds   = [a for a in details_list if a.get("type") == "rg"]
+            by_rounds   = [a for a in details_list if a.get("type") == "by"]
+            rg_total    = sum(a.get("total_assigned", 0) + a.get("unassigned", 0) for a in rg_rounds) or len(rg_rounds)
+            by_total    = sum(a.get("total_assigned", 0) + a.get("unassigned", 0) for a in by_rounds) or len(by_rounds)
+            rg_correct  = sum(a.get("correct", 0) for a in rg_rounds)
+            by_correct  = sum(a.get("correct", 0) for a in by_rounds)
+            total_correct = sum(a.get("correct", 0) for a in details_list)
+            total_tiles   = sum(
+                a.get("total_assigned", 0) + a.get("unassigned", 0)
+                for a in details_list
+            ) or row["total_questions"]
             summary = {
-                "correct":    correct,
-                "total":      total,
-                "rg_correct": rg_correct,
-                "rg_total":   rg_total,
-                "by_correct": by_correct,
-                "by_total":   by_total,
+                "correct":             total_correct,
+                "total":               total_tiles,
+                "rg_correct":          rg_correct,
+                "rg_total":            rg_total,
+                "by_correct":          by_correct,
+                "by_total":            by_total,
+                "total_correct":       total_correct,
+                "total_tiles":         total_tiles,
+                "total_rg_errors":     sum(a.get("rg_errors", 0) for a in details_list),
+                "total_tritan_errors": sum(a.get("tritan_errors", 0) for a in details_list),
+                "control_accuracy":    1.0,
+                "rounds":              len(details_list),
             }
             report_data["summary"] = summary
             report_data["details"] = details_list
@@ -1812,13 +1945,26 @@ def _generate_pdf_report(report: dict, filename: str):
     elif kind == "mosaic":
         summary = report.get("summary", {})
         story.append(Paragraph("Score Summary", heading_style))
-        
+
+        total_tiles  = summary.get("total_tiles", summary.get("total", 0))
+        total_correct = summary.get("total_correct", summary.get("correct", 0))
+        rg_correct   = summary.get("rg_correct", 0)
+        rg_total     = summary.get("rg_total", 0)
+        by_correct   = summary.get("by_correct", 0)
+        by_total     = summary.get("by_total", 0)
+        rg_errors    = summary.get("total_rg_errors", 0)
+        trit_errors  = summary.get("total_tritan_errors", 0)
+        ctrl_acc     = summary.get("control_accuracy", 1.0)
+
         score_data = [
             ["Metric", "Result"],
-            ["Total Questions", str(summary.get('total', 0))],
-            ["Correct Answers", str(summary.get('correct', 0))],
-            ["Red-Green Correct", f"{summary.get('rg_correct', 0)} / {summary.get('rg_total', 0)}"],
-            ["Blue-Yellow Correct", f"{summary.get('by_correct', 0)} / {summary.get('by_total', 0)}"],
+            ["Total Tiles",            str(total_tiles)],
+            ["Correctly Grouped",      str(total_correct)],
+            ["Red-Green Plate",        f"{rg_correct} / {rg_total} correct"],
+            ["Blue-Yellow Plate",      f"{by_correct} / {by_total} correct"],
+            ["Red-Green Confusions",   str(rg_errors)],
+            ["Blue-Yellow Confusions", str(trit_errors)],
+            ["Control Accuracy",       f"{round(ctrl_acc * 100)}%"],
         ]
         score_table = Table(score_data, colWidths=[2.5 * inch, 4.3 * inch])
         score_table.setStyle(TableStyle([
@@ -1837,33 +1983,31 @@ def _generate_pdf_report(report: dict, filename: str):
 
         details = report.get("details", [])
         if details:
-            story.append(Paragraph("Answer Details", heading_style))
-            a_data = [["Question", "Expected", "Your Answer", "Result"]]
+            story.append(Paragraph("Round Breakdown", heading_style))
+            a_data = [["Round", "Plate Type", "Correct Tiles", "RG Errors", "BY Errors", "Unassigned"]]
             for item in details:
                 a_data.append([
-                    f"Q{item['id']} - {item['label']}",
-                    str(item.get("correct_answer", "")),
-                    str(item.get("user_answer", "")),
-                    "Correct" if item.get("is_correct") else "Incorrect"
+                    f"Round {item.get('id', '')}",
+                    item.get("label", item.get("type", "")),
+                    f"{item.get('correct', 0)} / {item.get('total_assigned', 0) + item.get('unassigned', 0)}",
+                    str(item.get("rg_errors", 0)),
+                    str(item.get("tritan_errors", 0)),
+                    str(item.get("unassigned", 0)),
                 ])
-            
-            a_table = Table(a_data, colWidths=[2.3 * inch, 1.3 * inch, 1.5 * inch, 1.7 * inch])
-            result_colors = [
-                ("TEXTCOLOR", (3, i + 1), (3, i + 1),
-                 colors.HexColor("#2e7d32") if row[3] == "Correct" else colors.HexColor("#c62828"))
-                for i, row in enumerate(a_data[1:])
-            ]
+
+            col_w = [0.8*inch, 1.4*inch, 1.2*inch, 1.0*inch, 1.0*inch, 1.0*inch]
+            a_table = Table(a_data, colWidths=col_w)
             a_table.setStyle(TableStyle([
                 ("BACKGROUND",   (0, 0), (-1, 0), colors.HexColor("#3949ab")),
                 ("TEXTCOLOR",    (0, 0), (-1, 0), colors.white),
                 ("FONTNAME",     (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE",     (0, 0), (-1, -1), 10),
+                ("FONTSIZE",     (0, 0), (-1, -1), 9),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
                 ("GRID",         (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
                 ("TOPPADDING",   (0, 0), (-1, -1), 5),
                 ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
                 ("LEFTPADDING",  (0, 0), (-1, -1), 6),
-            ] + result_colors))
+            ]))
             story.append(a_table)
             
     doc.build(story)
