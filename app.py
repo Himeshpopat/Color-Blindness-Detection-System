@@ -26,8 +26,81 @@ app.secret_key = "change-this-secret-key"
 
 # Email / OTP configuration
 OTP_SENDER_EMAIL    = "societysynced@gmail.com"
-OTP_SENDER_PASSWORD = "tvqtykupebrbcfon"   # ← paste app password here
+OTP_SENDER_PASSWORD = "tvqtykupebrbcfon"   # ← use Gmail App Password here
 OTP_EXPIRY_MINUTES  = 10
+
+# ============================================================================
+# EMAIL SENDING FUNCTION (PREVIOUSLY MISSING)
+# ============================================================================
+def _send_otp_email(recipient_email: str, otp_code: str) -> tuple:
+    """
+    Send an OTP email using Gmail SMTP.
+    
+    Args:
+        recipient_email: Email address to send OTP to
+        otp_code: 6-digit OTP code
+    
+    Returns:
+        (success: bool, error_message: str)
+        - (True, "") on success
+        - (False, error_msg) on failure
+    """
+    try:
+        subject = "Your Color Vision Test OTP"
+        
+        # HTML email body
+        html_body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px;">
+                <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
+                    <h2 style="color: #1a1a2e;">Color Vision Test - Email Verification</h2>
+                    <p style="font-size: 16px; color: #333;">Your one-time password is:</p>
+                    <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
+                        <p style="font-size: 36px; font-weight: bold; color: #3949ab; letter-spacing: 8px; margin: 0;">{otp_code}</p>
+                    </div>
+                    <p style="font-size: 14px; color: #666;">This code will expire in <strong>{OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+                    <p style="font-size: 12px; color: #999; margin-top: 20px;">
+                        <strong>Security Note:</strong> Never share this code with anyone. Our support team will never ask for it.
+                    </p>
+                </div>
+            </body>
+        </html>
+        """
+        
+        # Create email message
+        message = MIMEMultipart("alternative")
+        message["Subject"] = subject
+        message["From"] = OTP_SENDER_EMAIL
+        message["To"] = recipient_email
+        
+        # Attach HTML content
+        html_part = MIMEText(html_body, "html")
+        message.attach(html_part)
+        
+        # Connect to Gmail SMTP and send
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()  # Start TLS encryption
+            server.login(OTP_SENDER_EMAIL, OTP_SENDER_PASSWORD)
+            server.sendmail(OTP_SENDER_EMAIL, recipient_email, message.as_string())
+        
+        print(f"[SUCCESS] OTP email sent to {recipient_email}")
+        return (True, "")
+        
+    except smtplib.SMTPAuthenticationError as e:
+        error_msg = "Gmail authentication failed. Check your app password."
+        print(f"[EMAIL ERROR] {error_msg} - {str(e)}")
+        return (False, error_msg)
+        
+    except smtplib.SMTPException as e:
+        error_msg = f"SMTP error while sending email: {str(e)}"
+        print(f"[EMAIL ERROR] {error_msg}")
+        return (False, error_msg)
+        
+    except Exception as e:
+        error_msg = f"Failed to send email: {type(e).__name__}: {str(e)}"
+        print(f"[EMAIL ERROR] {error_msg}")
+        return (False, error_msg)
+
 
 # Database
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_results.db")
@@ -51,7 +124,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            username TEXT TEXT UNIQUE NOT NULL,
+            username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             age INTEGER,
@@ -2022,18 +2095,17 @@ def _generate_pdf_report(report: dict, filename: str):
 # Entry point
 @app.route("/test-email")
 def test_email():
-    import smtplib
+    """Test email configuration."""
     try:
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.ehlo()
             server.starttls()
-            server.ehlo()
             server.login(OTP_SENDER_EMAIL, OTP_SENDER_PASSWORD)
-            return f"<h2 style='color:green'>✓ Login SUCCESS for {OTP_SENDER_EMAIL}</h2>"
+            return f"<h2 style='color:green'>✓ Email Login SUCCESS for {OTP_SENDER_EMAIL}</h2>"
     except smtplib.SMTPAuthenticationError as e:
-        return f"<h2 style='color:red'>✗ Auth Failed</h2><pre>{e.smtp_code}: {e.smtp_error}</pre>"
+        error = e.smtp_error.decode() if hasattr(e.smtp_error, 'decode') else str(e)
+        return f"<h2 style='color:red'>✗ Authentication Failed</h2><p>Error: {error}</p><p style='color:#666;'><strong>Fix:</strong> Use a Gmail App Password, not your regular password. <a href='https://support.google.com/accounts/answer/185833' target='_blank'>Create one here</a></p>"
     except Exception as e:
-        return f"<h2 style='color:red'>✗ Error</h2><pre>{type(e).__name__}: {e}</pre>"
+        return f"<h2 style='color:red'>✗ Error</h2><pre>{type(e).__name__}: {str(e)}</pre>"
 
 if __name__ == "__main__":
     app.run(debug=True)
